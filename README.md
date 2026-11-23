@@ -1,6 +1,14 @@
-# Credit Scoring em Produção — Sustentação, Drift e Governança
+<p align="center">
+  <img src="docs/assets/capa.png" alt="SENTRIX — Continuous ML Observability &amp; Governance for Credit Risk" width="100%">
+</p>
 
-**Tech Challenge — Fase 4 · PosTech Machine Learning Engineering (FIAP)**
+# SENTRIX
+
+### Continuous ML Observability & Governance for Credit Risk
+
+Projeto desenvolvido para o **Tech Challenge — Fase 4** da Pós-Tech em Machine Learning Engineering da FIAP.
+
+Plataforma de observabilidade contínua para modelos de Credit Scoring, contemplando validação de dados, detecção de Data Drift e Concept Drift, monitoramento operacional e governança de dados.
 
 Uma fintech de crédito tem um modelo de *credit scoring* em produção. Com inflação e novos perfis de clientes, a diretoria suspeita que ele está degradando em silêncio. Este repositório constrói a **camada de sustentação e confiabilidade** em volta desse modelo:
 
@@ -184,8 +192,8 @@ Duas camadas complementares, comparando cada lote de produção com a referênci
 | Camada | Onde | Conteúdo |
 |---|---|---|
 | **Logs estruturados** | `logs/pipeline.jsonl` | 1 evento JSON por início/fim de etapa: `ts, level, run_id, stage, status, duration_ms, batch, rows, …` + todos os alertas. Pronto para Datadog / Loki / CloudWatch. |
-| **MLflow** (`mlflow.db`) | experimento `credit-scoring-training` | parâmetros, métricas do holdout, hash SHA-256 dos dados de referência, modelo e importâncias (linhagem) |
-| | experimento `credit-scoring-monitoring` | 1 run pai por execução + 1 run filho por lote com todas as métricas, PSI por feature, alertas e o HTML do Evidently; métricas `timeline_*` com `step` = mês para gráficos no UI |
+| **MLflow** (`mlflow.db`) | experimento `sentrix-training` | parâmetros, métricas do holdout, hash SHA-256 dos dados de referência, modelo e importâncias (linhagem) |
+| | experimento `sentrix-monitoring` | 1 run pai por execução + 1 run filho por lote com todas as métricas, PSI por feature, alertas e o HTML do Evidently; métricas `timeline_*` com `step` = mês para gráficos no UI |
 | **Prometheus** | `reports/metrics.prom` | gauges no formato textfile (compatível com node_exporter): `credit_pipeline_batch_validation_passed`, `credit_feature_psi{feature}`, `credit_model_auc`, `credit_model_inference_latency_ms`, `credit_alerts_total{severity}`… |
 | **Dashboard** | `reports/monitoring_dashboard.html` | KPIs, AUC × inadimplência, drift por mês, heatmap PSI feature × mês, decomposição causal, latência/volume, fairness, execuções por etapa (lidas dos logs), tabela de lotes e de alertas com links para cada relatório Evidently |
 | **Alertas** | `reports/alerts.json` + logs | 36 alertas na execução de referência (12 críticos, 24 warnings) |
