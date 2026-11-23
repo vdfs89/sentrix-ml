@@ -6,6 +6,23 @@ on:
   pull_request:
 
 jobs:
+  alert-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Prometheus alert rules
+        run: >
+          docker run --rm -v "$PWD/monitoring/prometheus:/rules" -w /rules
+          --entrypoint promtool prom/prometheus:v2.55.1 check rules alerts.yml
+      - name: Unit-test alert rules (promtool)
+        run: >
+          docker run --rm -v "$PWD/monitoring/prometheus:/rules" -w /rules
+          --entrypoint promtool prom/prometheus:v2.55.1 test rules alerts_test.yml
+      - name: Grafana dashboard is in sync with its generator
+        run: |
+          python monitoring/grafana/generate_dashboard.py
+          git diff --exit-code monitoring/grafana/dashboards/sentrix.json
+
   test-and-monitor:
     runs-on: ubuntu-latest
     env:
