@@ -1,0 +1,46 @@
+# SENTRIX observability stack: Pushgateway -> Prometheus (alert rules) -> Grafana (dashboard as code).
+#   docker compose up -d
+#   SENTRIX_PUSHGATEWAY=http://localhost:9091 python -m src.pipeline   (or: python -m src.push_metrics)
+#   Grafana http://localhost:3100 · Prometheus http://localhost:9190 · Pushgateway http://localhost:9091
+#   (host ports differ from 3000/9090 so it can run next to other stacks; override via SENTRIX_*_PORT)
+name: sentrix
+
+services:
+  pushgateway:
+    image: prom/pushgateway:v1.9.0
+    ports: ["${SENTRIX_PUSHGATEWAY_PORT:-9091}:9091"]
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports: ["${SENTRIX_PROMETHEUS_PORT:-9190}:9090"]
+    depends_on: [pushgateway]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"        # local demo only: read-only viewer access
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/sentrix.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["${SENTRIX_GRAFANA_PORT:-3100}:3000"]
+    depends_on: [prometheus]
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+  grafana-data:
