@@ -38,8 +38,8 @@ PRODUCTION_START = "2025-07-01"
 # MLflow (local, file-free sqlite backend)
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", f"sqlite:///{(ROOT / 'mlflow.db').as_posix()}")
 MLFLOW_ARTIFACT_ROOT = (ROOT / "mlartifacts").as_uri()
-MLFLOW_TRAINING_EXPERIMENT = "credit-scoring-training"
-MLFLOW_MONITORING_EXPERIMENT = "credit-scoring-monitoring"
+MLFLOW_TRAINING_EXPERIMENT = "sentrix-training"
+MLFLOW_MONITORING_EXPERIMENT = "sentrix-monitoring"
 
 # Pseudonymisation salt (LGPD art. 13 §4). In production comes from a secret manager.
 PII_SALT_ENV = "CREDIT_PII_SALT"

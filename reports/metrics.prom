@@ -18,12 +18,12 @@ credit_pipeline_rows_processed{batch="2025-11"} 2495.0
 credit_pipeline_rows_processed{batch="2025-12"} 2490.0
 # HELP credit_model_inference_latency_ms Batch inference latency (ms)
 # TYPE credit_model_inference_latency_ms gauge
-credit_model_inference_latency_ms{batch="2025-07"} 4.92
-credit_model_inference_latency_ms{batch="2025-08"} 4.96
-credit_model_inference_latency_ms{batch="2025-09"} 5.26
-credit_model_inference_latency_ms{batch="2025-10"} 5.02
-credit_model_inference_latency_ms{batch="2025-11"} 5.1
-credit_model_inference_latency_ms{batch="2025-12"} 5.09
+credit_model_inference_latency_ms{batch="2025-07"} 5.45
+credit_model_inference_latency_ms{batch="2025-08"} 5.37
+credit_model_inference_latency_ms{batch="2025-09"} 6.08
+credit_model_inference_latency_ms{batch="2025-10"} 5.89
+credit_model_inference_latency_ms{batch="2025-11"} 5.16
+credit_model_inference_latency_ms{batch="2025-12"} 6.8
 # HELP credit_data_drift_share Share of features with critical drift
 # TYPE credit_data_drift_share gauge
 credit_data_drift_share{batch="2025-07"} 0.0

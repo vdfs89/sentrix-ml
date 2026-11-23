@@ -176,7 +176,7 @@ def build_dashboard(records: list[dict], alerts: list[dict], causal: list[dict],
 
     page = f"""<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Credit Scoring Monitoring</title>
+<title>SENTRIX Monitoring</title>
 <style>
 :root {{ --bg:#f8fafc; --card:#fff; --fg:#0f172a; --muted:#64748b; --border:#e2e8f0; }}
 body {{ margin:0; background:var(--bg); color:var(--fg); font-family:Inter,'Segoe UI',sans-serif; }}
@@ -195,7 +195,7 @@ tr.bad td:first-child {{ border-left:4px solid {RED}; }} tr.warn td:first-child 
 tr.good td:first-child {{ border-left:4px solid {GREEN}; }} .muted {{ color:var(--muted); }}
 @media (max-width:640px) {{ main,header {{ padding:16px; }} .grid {{ grid-template-columns:1fr; }} }}
 </style></head><body>
-<header><h1>Credit Scoring — Observabilidade, Drift e Governança</h1>
+<header><h1>SENTRIX — Continuous ML Observability &amp; Governance for Credit Risk</h1>
 <p>Modelo {meta['model_name']} v{meta['version']} · pipeline run {RUN_ID} · threshold {meta['threshold']:.2f} ·
 referência {meta['reference_rows']} linhas · atributos protegidos excluídos: {', '.join(meta['excluded_protected_attributes'])}</p></header>
 <main>
