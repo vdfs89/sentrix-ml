@@ -172,3 +172,53 @@ credit_model_auc{batch="2025-12"} 0.6830816828971727
 # TYPE credit_alerts_total gauge
 credit_alerts_total{severity="WARNING"} 24.0
 credit_alerts_total{severity="CRITICAL"} 12.0
+# HELP credit_contract_violations Contract violations by rule
+# TYPE credit_contract_violations gauge
+credit_contract_violations{batch="2025-09_upstream_bug",rule="R1"} 24.0
+credit_contract_violations{batch="2025-09_upstream_bug",rule="R2"} 18.0
+credit_contract_violations{batch="2025-09_upstream_bug",rule="R3"} 8.0
+credit_contract_violations{batch="2025-09_upstream_bug",rule="R4"} 10.0
+credit_contract_violations{batch="2025-09_upstream_bug",rule="R5"} 5.0
+credit_contract_violations{batch="2025-09_upstream_bug",rule="R6"} 7.0
+credit_contract_violations{batch="2025-09_upstream_bug",rule="R7"} 30.0
+credit_contract_violations{batch="2025-09_upstream_bug",rule="R9"} 1.0
+# HELP credit_prediction_psi PSI of the model score vs reference
+# TYPE credit_prediction_psi gauge
+credit_prediction_psi{batch="2025-07"} 0.003783113771579798
+credit_prediction_psi{batch="2025-08"} 0.0057775336282592125
+credit_prediction_psi{batch="2025-09"} 0.029814922604065725
+credit_prediction_psi{batch="2025-10"} 0.06320888936071735
+credit_prediction_psi{batch="2025-11"} 0.19403408824301902
+credit_prediction_psi{batch="2025-12"} 0.3636729487672708
+# HELP credit_disparate_impact Approval-rate ratio between sex groups
+# TYPE credit_disparate_impact gauge
+credit_disparate_impact{batch="2025-07"} 0.9842
+credit_disparate_impact{batch="2025-08"} 0.911
+credit_disparate_impact{batch="2025-09"} 0.9557
+credit_disparate_impact{batch="2025-10"} 0.9398
+credit_disparate_impact{batch="2025-11"} 0.9307
+credit_disparate_impact{batch="2025-12"} 0.9355
+# HELP credit_approval_rate Share of approved applications
+# TYPE credit_approval_rate gauge
+credit_approval_rate{batch="2025-07"} 0.7058116232464929
+credit_approval_rate{batch="2025-08"} 0.7286573146292585
+credit_approval_rate{batch="2025-09"} 0.6817635270541083
+credit_approval_rate{batch="2025-10"} 0.6541082164328658
+credit_approval_rate{batch="2025-11"} 0.5915831663326653
+credit_approval_rate{batch="2025-12"} 0.52570281124498
+# HELP credit_observed_default_rate Observed default rate (delayed labels)
+# TYPE credit_observed_default_rate gauge
+credit_observed_default_rate{batch="2025-07"} 0.21723446893787576
+credit_observed_default_rate{batch="2025-08"} 0.2088176352705411
+credit_observed_default_rate{batch="2025-09"} 0.21402805611222445
+credit_observed_default_rate{batch="2025-10"} 0.25410821643286574
+credit_observed_default_rate{batch="2025-11"} 0.32344689378757513
+credit_observed_default_rate{batch="2025-12"} 0.37991967871485943
+# HELP credit_model_baseline Reference holdout metrics
+# TYPE credit_model_baseline gauge
+credit_model_baseline{metric="auc"} 0.781938697072577
+credit_model_baseline{metric="observed_default_rate"} 0.22333333333333333
+credit_model_baseline{metric="approval_rate"} 0.7046666666666667
+# HELP credit_pipeline_last_success_timestamp_seconds Unix time of the last successful pipeline run
+# TYPE credit_pipeline_last_success_timestamp_seconds gauge
+credit_pipeline_last_success_timestamp_seconds 1.7954342899660597e+09

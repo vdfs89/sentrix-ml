@@ -148,7 +148,7 @@ def run_monitoring() -> dict:
         save_json(records, "monitoring_records.json")
         save_json(all_alerts, "alerts.json")
         save_json(causal, "causal_analysis.json")
-        export_prometheus(records, all_alerts)
+        export_prometheus(records, all_alerts, baseline)
         with stage(logger, "dashboard"):
             path = build_dashboard(records, all_alerts, causal, meta)
         for f in ("monitoring_records.json", "alerts.json", "causal_analysis.json", "metrics.prom"):

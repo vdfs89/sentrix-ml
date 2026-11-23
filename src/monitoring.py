@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Any
 
 import mlflow
-from prometheus_client import CollectorRegistry, Gauge, write_to_textfile
+from prometheus_client import CollectorRegistry, Gauge, push_to_gateway, write_to_textfile
 
 from . import config
 from .logging_utils import get_logger, log_event
@@ -82,8 +83,9 @@ def emit_alerts(alerts: list[dict[str, Any]]) -> None:
 
 # --- Prometheus ----------------------------------------------------------------------------------
 
-def export_prometheus(records: list[dict[str, Any]], alerts: list[dict[str, Any]]) -> None:
-    """Write metrics in Prometheus text format (node_exporter textfile collector compatible)."""
+def build_registry(records: list[dict[str, Any]], alerts: list[dict[str, Any]],
+                   baseline: dict[str, float]) -> CollectorRegistry:
+    """Translate monitoring records into Prometheus gauges (one label set per batch)."""
     reg = CollectorRegistry()
     g_status = Gauge("credit_pipeline_batch_validation_passed", "1 if batch passed the contract",
                      ["batch"], registry=reg)
@@ -95,21 +97,65 @@ def export_prometheus(records: list[dict[str, Any]], alerts: list[dict[str, Any]
     g_psi = Gauge("credit_feature_psi", "PSI per feature", ["batch", "feature"], registry=reg)
     g_auc = Gauge("credit_model_auc", "AUC when labels are available", ["batch"], registry=reg)
     g_alerts = Gauge("credit_alerts_total", "Alerts by severity", ["severity"], registry=reg)
+    g_rule = Gauge("credit_contract_violations", "Contract violations by rule",
+                   ["batch", "rule"], registry=reg)
+    g_pred = Gauge("credit_prediction_psi", "PSI of the model score vs reference",
+                   ["batch"], registry=reg)
+    g_di = Gauge("credit_disparate_impact", "Approval-rate ratio between sex groups",
+                 ["batch"], registry=reg)
+    g_appr = Gauge("credit_approval_rate", "Share of approved applications", ["batch"], registry=reg)
+    g_dr = Gauge("credit_observed_default_rate", "Observed default rate (delayed labels)",
+                 ["batch"], registry=reg)
+    g_base = Gauge("credit_model_baseline", "Reference holdout metrics", ["metric"], registry=reg)
+    g_last = Gauge("credit_pipeline_last_success_timestamp_seconds",
+                   "Unix time of the last successful pipeline run", registry=reg)
 
     for r in records:
         b = r["batch"]
         g_status.labels(b).set(1 if r.get("validation_passed") else 0)
         g_rows.labels(b).set(r.get("rows", 0))
+        for rule, n in (r.get("failed_rules") or {}).items():
+            g_rule.labels(b, rule).set(n)
         if r.get("validation_passed"):
             g_lat.labels(b).set(r.get("inference_latency_ms", 0))
             g_share.labels(b).set(r.get("drift_share", 0))
+            g_pred.labels(b).set(r.get("prediction_psi", 0))
+            g_appr.labels(b).set(r.get("approval_rate", 0))
             for f, v in r.get("psi", {}).items():
                 g_psi.labels(b, f).set(v)
             if r.get("auc") is not None:
                 g_auc.labels(b).set(r["auc"])
+            if r.get("observed_default_rate") is not None:
+                g_dr.labels(b).set(r["observed_default_rate"])
+            if r.get("disparate_impact") is not None:
+                g_di.labels(b).set(r["disparate_impact"])
     for sev in ("WARNING", "CRITICAL"):
         g_alerts.labels(sev).set(sum(a["severity"] == sev for a in alerts))
+    for k in ("auc", "observed_default_rate", "approval_rate"):
+        if baseline.get(k) is not None:
+            g_base.labels(k).set(baseline[k])
+    g_last.set_to_current_time()
+    return reg
+
+
+def export_prometheus(records: list[dict[str, Any]], alerts: list[dict[str, Any]],
+                      baseline: dict[str, float]) -> None:
+    """Write metrics in Prometheus text format and, if configured, push them to a Pushgateway.
+
+    Batch jobs do not live long enough to be scraped, so the standard pattern is to push the
+    final state to a Pushgateway that Prometheus scrapes (see docker-compose.yml).
+    """
+    reg = build_registry(records, alerts, baseline)
     write_to_textfile(str(config.REPORTS_DIR / "metrics.prom"), reg)
+    gateway = os.getenv(config.PUSHGATEWAY_ENV)
+    if gateway:
+        try:
+            push_to_gateway(gateway, job="sentrix_pipeline", registry=reg, timeout=5)
+            log_event(logger, logging.INFO, "metrics pushed", stage="prometheus_push",
+                      status="success", gateway=gateway)
+        except OSError as exc:  # monitoring must never break the pipeline
+            log_event(logger, logging.WARNING, f"pushgateway unreachable: {exc}",
+                      stage="prometheus_push", status="failed", gateway=gateway)
 
 
 def save_json(obj: Any, name: str) -> None:

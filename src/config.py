@@ -43,6 +43,9 @@ MLFLOW_MONITORING_EXPERIMENT = "sentrix-monitoring"
 
 # Pseudonymisation salt (LGPD art. 13 §4). In production comes from a secret manager.
 PII_SALT_ENV = "CREDIT_PII_SALT"
+
+# Prometheus Pushgateway (e.g. http://localhost:9091). Unset = only write reports/metrics.prom
+PUSHGATEWAY_ENV = "SENTRIX_PUSHGATEWAY"
 DEFAULT_DEV_SALT = "dev-only-salt-change-me"
 
 TARGET = "default"
