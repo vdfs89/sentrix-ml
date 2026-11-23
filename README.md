@@ -16,7 +16,7 @@ Uma fintech de crédito tem um modelo de *credit scoring* em produção. Com inf
 |---|---|---|
 | 1. Validação de dados | Contrato **Pandera** com 10 regras rígidas, gate que bloqueia e coloca em quarentena lotes ruins | `src/contracts.py`, `data/quarantine/*`, alerta `ingestion_blocked` |
 | 2. Drift | Simulação de 6 meses de produção (data drift + concept drift), PSI + KS próprios e relatórios **Evidently AI** | `reports/evidently/drift_report_<mês>.html`, `reports/drift_tables/*.csv` |
-| 3. Observabilidade | Logs estruturados JSON, **MLflow** (treino + monitoramento por lote), métricas **Prometheus**, dashboard HTML | `logs/pipeline.jsonl`, `mlflow.db`, `reports/metrics.prom`, `reports/monitoring_dashboard.html` |
+| 3. Observabilidade | Logs estruturados JSON, **MLflow** (treino + monitoramento por lote), stack **Pushgateway → Prometheus → Grafana** como código, 11 regras de alerta testadas com `promtool` | `logs/pipeline.jsonl`, `mlflow.db`, `docker-compose.yml`, `monitoring/`, `reports/monitoring_dashboard.html` |
 | 4. Governança | Privacy by Design (pseudonimização, minimização, schema estrito), plano LGPD, auditoria de viés, análise causal | este README, `reports/causal_analysis.json` |
 
 > 🎥 **Vídeo STAR (≤ 5 min):** _adicionar link aqui_
@@ -34,6 +34,7 @@ Uma fintech de crédito tem um modelo de *credit scoring* em produção. Com inf
 8. [Etapa 4 — Governança e LGPD](#etapa-4--governança-e-lgpd)
 9. [Lições aprendidas](#lições-aprendidas)
 10. [Estrutura do repositório](#estrutura-do-repositório)
+11. [Versionamento](#versionamento)
 
 ---
 
@@ -50,14 +51,35 @@ pip install -r requirements.txt
 export CREDIT_PII_SALT="um-segredo-forte"
 
 python -m src.pipeline          # ingestão → treino → simulação → monitoramento → relatórios (~30 s)
-pytest -q                       # 16 testes: contratos, estatística de drift, regras de alerta
+pytest -q                       # 17 testes: contratos, estatística de drift, regras de alerta, métricas
 
 mlflow ui --backend-store-uri sqlite:///mlflow.db   # http://127.0.0.1:5000
 ```
 
 Depois de rodar, abra **`reports/monitoring_dashboard.html`** no navegador. Etapas isoladas: `python -m src.ingestion`, `python -m src.train`, `python -m src.drift_simulation`, `python -m src.pipeline --monitor`.
 
-O CI (`.github/workflows/ci.yml`) roda os testes e o pipeline completo a cada push e publica os relatórios como artefato.
+### Stack de observabilidade (Docker)
+
+```bash
+docker compose up -d                                   # Pushgateway + Prometheus + Grafana
+export SENTRIX_PUSHGATEWAY=http://localhost:9091       # PowerShell: $env:SENTRIX_PUSHGATEWAY="http://localhost:9091"
+python -m src.pipeline                                 # ou só reenviar o último run: python -m src.push_metrics
+```
+
+| Serviço | URL | Observação |
+|---|---|---|
+| Grafana | http://localhost:3100 | dashboard **SENTRIX** abre como home (acesso anônimo de leitura; admin/`GRAFANA_ADMIN_PASSWORD`) |
+| Prometheus | http://localhost:9190 | regras em *Alerts*, 36 alertas após o pipeline |
+| Pushgateway | http://localhost:9091 | estado final de cada execução do job batch |
+
+As portas do host fogem de 3000/9090 para a stack rodar ao lado de outros projetos; troque com `SENTRIX_GRAFANA_PORT`, `SENTRIX_PROMETHEUS_PORT` e `SENTRIX_PUSHGATEWAY_PORT`.
+
+```bash
+# validar e testar as regras de alerta
+docker run --rm -v "$PWD/monitoring/prometheus:/rules" -w /rules --entrypoint promtool prom/prometheus:v2.55.1 test rules alerts_test.yml
+```
+
+O CI (`.github/workflows/ci.yml`) tem dois jobs: **alert-rules** (`promtool check` + `promtool test` e verificação de que o JSON do Grafana está em sincronia com o gerador) e **test-and-monitor** (pytest + pipeline completo, relatórios publicados como artefato).
 
 ---
 
@@ -81,6 +103,7 @@ flowchart LR
     AU -.-> F
     D & PF & F --> AL[Regras de alerta]
     AL --> L[Logs JSON] & M[MLflow] & PR[metrics.prom] & DB[Dashboard HTML]
+    PR --> PG[Pushgateway] --> PM[Prometheus<br/>11 regras de alerta] --> GF[Grafana<br/>dashboard as code]
     S --> C[Análise causal<br/>intervenções do]
     C --> DB
 ```
@@ -194,9 +217,28 @@ Duas camadas complementares, comparando cada lote de produção com a referênci
 | **Logs estruturados** | `logs/pipeline.jsonl` | 1 evento JSON por início/fim de etapa: `ts, level, run_id, stage, status, duration_ms, batch, rows, …` + todos os alertas. Pronto para Datadog / Loki / CloudWatch. |
 | **MLflow** (`mlflow.db`) | experimento `sentrix-training` | parâmetros, métricas do holdout, hash SHA-256 dos dados de referência, modelo e importâncias (linhagem) |
 | | experimento `sentrix-monitoring` | 1 run pai por execução + 1 run filho por lote com todas as métricas, PSI por feature, alertas e o HTML do Evidently; métricas `timeline_*` com `step` = mês para gráficos no UI |
-| **Prometheus** | `reports/metrics.prom` | gauges no formato textfile (compatível com node_exporter): `credit_pipeline_batch_validation_passed`, `credit_feature_psi{feature}`, `credit_model_auc`, `credit_model_inference_latency_ms`, `credit_alerts_total{severity}`… |
+| **Prometheus** | `reports/metrics.prom` → Pushgateway → Prometheus | gauges por lote: `credit_pipeline_batch_validation_passed`, `credit_contract_violations{rule}`, `credit_feature_psi{feature}`, `credit_data_drift_share`, `credit_prediction_psi`, `credit_model_auc`, `credit_model_baseline{metric}`, `credit_observed_default_rate`, `credit_approval_rate`, `credit_disparate_impact`, `credit_model_inference_latency_ms`, `credit_pipeline_last_success_timestamp_seconds` |
+| **Grafana** | `monitoring/grafana/` | dashboard provisionado (gerado por `generate_dashboard.py`): KPIs, AUC/drift/score por lote, PSI por feature com seletor de lote, default e aprovação, fairness, latência, violações do contrato por regra e alertas disparados |
 | **Dashboard** | `reports/monitoring_dashboard.html` | KPIs, AUC × inadimplência, drift por mês, heatmap PSI feature × mês, decomposição causal, latência/volume, fairness, execuções por etapa (lidas dos logs), tabela de lotes e de alertas com links para cada relatório Evidently |
 | **Alertas** | `reports/alerts.json` + logs | 36 alertas na execução de referência (12 críticos, 24 warnings) |
+
+### Regras de alerta no Prometheus
+
+`monitoring/prometheus/alerts.yml` replica as regras do relatório Python — as duas camadas produzem os mesmos **36 alertas**:
+
+| Alerta | Expressão (resumo) | Severidade |
+|---|---|---|
+| `SentrixDataContractViolation` | `credit_pipeline_batch_validation_passed == 0` | critical |
+| `SentrixFeatureDriftWarning` / `Critical` | `credit_feature_psi` ≥ 0,10 / ≥ 0,20 | warning / critical |
+| `SentrixDatasetDrift` | `credit_data_drift_share >= 0.30` | critical |
+| `SentrixPredictionDriftWarning` / `SentrixPredictionDrift` | `credit_prediction_psi` ≥ 0,10 / ≥ 0,20 | warning / critical |
+| `SentrixConceptDrift` | AUC do lote < AUC baseline − 0,05 | critical |
+| `SentrixLabelDrift` | \|default observado − referência\| ≥ 0,05 | warning |
+| `SentrixFairnessDisparateImpact` | `credit_disparate_impact < 0.80` | warning |
+| `SentrixPipelineStale` | última execução há mais de 35 dias | warning |
+| `SentrixPushgatewayDown` | `up{job="pushgateway"} == 0` por 1 min | critical |
+
+`alerts_test.yml` tem 7 grupos de teste para o `promtool` com valores reais do pipeline. Ele cobre casos que **devem** disparar, casos que **não** devem (AUC 0,752 fica acima do limite, PSI 0,02 é estável, pipeline com 30 dias) e a janela `for: 1m`. Também foi feito um teste de mutação: subir o limite crítico de PSI para 0,40 faz o `promtool` falhar, o que prova que os testes pegam regressões.
 
 ### Métricas de saúde definidas
 
@@ -341,12 +383,30 @@ Informação negativa de crédito respeita o limite de 5 anos do CDC (art. 43, �
 │   ├── monitoring.py        # MLflow, regras de alerta, Prometheus
 │   ├── dashboard.py         # dashboard HTML (Plotly)
 │   ├── logging_utils.py     # logs JSON estruturados
+│   ├── push_metrics.py      # reenvia o último run ao Pushgateway
 │   └── pipeline.py          # orquestração ponta a ponta
 ├── tests/                   # pytest
 ├── reports/                 # dashboard, Evidently, drift tables, alertas, métricas
 ├── models/                  # modelo + metadados (versão, hash dos dados, métricas)
 ├── logs/pipeline.jsonl      # logs estruturados
+├── monitoring/
+│   ├── prometheus/          # prometheus.yml, alerts.yml (11 regras), alerts_test.yml (promtool)
+│   └── grafana/             # provisioning, dashboards/sentrix.json, generate_dashboard.py
+├── docker-compose.yml       # Pushgateway + Prometheus + Grafana
+├── docs/                    # capa
+├── CHANGELOG.md
 └── .github/workflows/ci.yml
 ```
 
-Bibliotecas: scikit-learn, XGBoost, Pandera, Evidently AI 0.7, MLflow 3, prometheus-client, Plotly, SciPy.
+## Versionamento
+
+| O quê | Versão | Onde |
+|---|---|---|
+| Projeto SENTRIX | **1.1.0** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0`, `v1.1.0` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
+| Modelo `credit-scoring-xgb` | 1.0.0 | `models/model_metadata.json` + MLflow (com hash SHA-256 dos dados de treino) |
+| Contrato de dados | `credit_scoring_input_contract_v1` | `src/contracts.py` |
+| Python | 3.11 | CI e ambiente local |
+| Dependências Python | versões exatas | `requirements.txt` (pandas 2.3.3, scikit-learn 1.9.1, XGBoost 3.2.0, Pandera 0.36.0, Evidently 0.7.23, MLflow 3.18.0, prometheus-client 0.26.0…) |
+| Imagens Docker | tags fixas | Prometheus v2.55.1 · Pushgateway v1.9.0 · Grafana 11.3.0 |
+
+Projeto, modelo e contrato têm versões independentes: mudar o dashboard não muda o modelo, e retreinar o modelo não muda o contrato.
