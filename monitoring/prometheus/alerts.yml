@@ -1,0 +1,111 @@
+# SENTRIX alert rules. Thresholds mirror src/config.py and src/monitoring.evaluate_alerts,
+# so the Python report and Prometheus raise the same alerts.
+# Unit-tested with: promtool test rules alerts_test.yml
+groups:
+  - name: sentrix-data-quality
+    rules:
+      - alert: SentrixDataContractViolation
+        expr: credit_pipeline_batch_validation_passed == 0
+        labels:
+          severity: critical
+          area: data_quality
+        annotations:
+          summary: "Lote {{ $labels.batch }} bloqueado pelo contrato de dados"
+          description: "O lote violou o contrato Pandera e foi colocado em quarentena; nenhuma predição foi gerada."
+
+  - name: sentrix-drift
+    rules:
+      - alert: SentrixFeatureDriftWarning
+        expr: credit_feature_psi >= 0.10 and credit_feature_psi < 0.20
+        labels:
+          severity: warning
+          area: data_drift
+        annotations:
+          summary: "Drift moderado em {{ $labels.feature }} ({{ $labels.batch }})"
+          description: "PSI = {{ $value | printf \"%.3f\" }} (limite 0.10)."
+
+      - alert: SentrixFeatureDriftCritical
+        expr: credit_feature_psi >= 0.20
+        labels:
+          severity: critical
+          area: data_drift
+        annotations:
+          summary: "Drift forte em {{ $labels.feature }} ({{ $labels.batch }})"
+          description: "PSI = {{ $value | printf \"%.3f\" }} (limite 0.20)."
+
+      - alert: SentrixDatasetDrift
+        expr: credit_data_drift_share >= 0.30
+        labels:
+          severity: critical
+          area: data_drift
+        annotations:
+          summary: "Dataset drift no lote {{ $labels.batch }}"
+          description: "{{ $value | humanizePercentage }} das features com PSI crítico (limite 30%)."
+
+      - alert: SentrixPredictionDriftWarning
+        expr: credit_prediction_psi >= 0.10 and credit_prediction_psi < 0.20
+        labels:
+          severity: warning
+          area: prediction_drift
+        annotations:
+          summary: "Score em mudança no lote {{ $labels.batch }}"
+          description: "PSI do score = {{ $value | printf \"%.3f\" }} (limite 0.10)."
+
+      - alert: SentrixPredictionDrift
+        expr: credit_prediction_psi >= 0.20
+        labels:
+          severity: critical
+          area: prediction_drift
+        annotations:
+          summary: "Distribuição do score mudou no lote {{ $labels.batch }}"
+          description: "PSI do score = {{ $value | printf \"%.3f\" }} (limite 0.20)."
+
+      - alert: SentrixConceptDrift
+        expr: credit_model_auc < on(job) group_left() (max by (job) (credit_model_baseline{metric="auc"}) - 0.05)
+        labels:
+          severity: critical
+          area: concept_drift
+        annotations:
+          summary: "AUC abaixo do limite no lote {{ $labels.batch }}"
+          description: "AUC = {{ $value | printf \"%.3f\" }}, mais de 0.05 abaixo do baseline."
+
+      - alert: SentrixLabelDrift
+        expr: abs(credit_observed_default_rate - on(job) group_left() max by (job) (credit_model_baseline{metric="observed_default_rate"})) >= 0.05
+        labels:
+          severity: warning
+          area: label_drift
+        annotations:
+          summary: "Taxa de default mudou no lote {{ $labels.batch }}"
+          description: "Desvio absoluto de {{ $value | humanizePercentage }} vs. referência."
+
+  - name: sentrix-governance
+    rules:
+      - alert: SentrixFairnessDisparateImpact
+        expr: credit_disparate_impact < 0.80
+        labels:
+          severity: warning
+          area: fairness
+        annotations:
+          summary: "Disparate impact abaixo de 0.80 no lote {{ $labels.batch }}"
+          description: "Razão de aprovação entre grupos = {{ $value | printf \"%.2f\" }} (regra dos 4/5)."
+
+  - name: sentrix-operations
+    rules:
+      - alert: SentrixPipelineStale
+        expr: time() - credit_pipeline_last_success_timestamp_seconds > 35 * 24 * 3600
+        labels:
+          severity: warning
+          area: operations
+        annotations:
+          summary: "Pipeline de monitoramento sem execução há mais de 35 dias"
+          description: "Lotes mensais podem não estar sendo monitorados."
+
+      - alert: SentrixPushgatewayDown
+        expr: up{job="pushgateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          area: operations
+        annotations:
+          summary: "Pushgateway fora do ar"
+          description: "Métricas do pipeline não estão chegando ao Prometheus."

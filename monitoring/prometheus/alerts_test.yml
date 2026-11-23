@@ -1,0 +1,164 @@
+# Unit tests for alerts.yml. Values come from the real pipeline run (reports/monitoring_records.json).
+# Run: docker run --rm -v "$PWD/monitoring/prometheus:/rules" --entrypoint promtool \
+#        prom/prometheus:v2.55.1 test rules /rules/alerts_test.yml
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  # 1. Corrupted batch blocked by the data contract; clean batch does not alert.
+  - interval: 15s
+    input_series:
+      - series: 'credit_pipeline_batch_validation_passed{job="sentrix_pipeline",batch="2025-09_upstream_bug"}'
+        values: "0x4"
+      - series: 'credit_pipeline_batch_validation_passed{job="sentrix_pipeline",batch="2025-07"}'
+        values: "1x4"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: SentrixDataContractViolation
+        exp_alerts:
+          - exp_labels: {severity: critical, area: data_quality, job: sentrix_pipeline, batch: 2025-09_upstream_bug}
+            exp_annotations:
+              summary: "Lote 2025-09_upstream_bug bloqueado pelo contrato de dados"
+              description: "O lote violou o contrato Pandera e foi colocado em quarentena; nenhuma predição foi gerada."
+
+  # 2. Feature PSI: age critical (0.33), pay_amt1 warning (0.15), pay_0 stable (0.02).
+  - interval: 15s
+    input_series:
+      - series: 'credit_feature_psi{job="sentrix_pipeline",batch="2025-12",feature="age"}'
+        values: "0.33x4"
+      - series: 'credit_feature_psi{job="sentrix_pipeline",batch="2025-12",feature="pay_amt1"}'
+        values: "0.15x4"
+      - series: 'credit_feature_psi{job="sentrix_pipeline",batch="2025-12",feature="pay_0"}'
+        values: "0.02x4"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: SentrixFeatureDriftCritical
+        exp_alerts:
+          - exp_labels: {severity: critical, area: data_drift, job: sentrix_pipeline, batch: "2025-12", feature: age}
+            exp_annotations:
+              summary: "Drift forte em age (2025-12)"
+              description: "PSI = 0.330 (limite 0.20)."
+      - eval_time: 30s
+        alertname: SentrixFeatureDriftWarning
+        exp_alerts:
+          - exp_labels: {severity: warning, area: data_drift, job: sentrix_pipeline, batch: "2025-12", feature: pay_amt1}
+            exp_annotations:
+              summary: "Drift moderado em pay_amt1 (2025-12)"
+              description: "PSI = 0.150 (limite 0.10)."
+
+  # 3. Dataset drift and prediction drift only in the last month.
+  - interval: 15s
+    input_series:
+      - series: 'credit_data_drift_share{job="sentrix_pipeline",batch="2025-12"}'
+        values: "0.333x4"
+      - series: 'credit_data_drift_share{job="sentrix_pipeline",batch="2025-11"}'
+        values: "0x4"
+      - series: 'credit_prediction_psi{job="sentrix_pipeline",batch="2025-12"}'
+        values: "0.364x4"
+      - series: 'credit_prediction_psi{job="sentrix_pipeline",batch="2025-11"}'
+        values: "0.194x4"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: SentrixDatasetDrift
+        exp_alerts:
+          - exp_labels: {severity: critical, area: data_drift, job: sentrix_pipeline, batch: "2025-12"}
+            exp_annotations:
+              summary: "Dataset drift no lote 2025-12"
+              description: "33.3% das features com PSI crítico (limite 30%)."
+      - eval_time: 30s
+        alertname: SentrixPredictionDrift
+        exp_alerts:
+          - exp_labels: {severity: critical, area: prediction_drift, job: sentrix_pipeline, batch: "2025-12"}
+            exp_annotations:
+              summary: "Distribuição do score mudou no lote 2025-12"
+              description: "PSI do score = 0.364 (limite 0.20)."
+      - eval_time: 30s
+        alertname: SentrixPredictionDriftWarning
+        exp_alerts:
+          - exp_labels: {severity: warning, area: prediction_drift, job: sentrix_pipeline, batch: "2025-11"}
+            exp_annotations:
+              summary: "Score em mudança no lote 2025-11"
+              description: "PSI do score = 0.194 (limite 0.10)."
+
+  # 4. Concept drift: AUC 0.700 < 0.782 - 0.05 fires; 0.752 does not. Label drift: 38% vs 22.3%.
+  - interval: 15s
+    input_series:
+      - series: 'credit_model_baseline{job="sentrix_pipeline",metric="auc"}'
+        values: "0.782x4"
+      - series: 'credit_model_baseline{job="sentrix_pipeline",metric="observed_default_rate"}'
+        values: "0.223x4"
+      - series: 'credit_model_auc{job="sentrix_pipeline",batch="2025-10"}'
+        values: "0.752x4"
+      - series: 'credit_model_auc{job="sentrix_pipeline",batch="2025-11"}'
+        values: "0.700x4"
+      - series: 'credit_observed_default_rate{job="sentrix_pipeline",batch="2025-07"}'
+        values: "0.217x4"
+      - series: 'credit_observed_default_rate{job="sentrix_pipeline",batch="2025-12"}'
+        values: "0.380x4"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: SentrixConceptDrift
+        exp_alerts:
+          - exp_labels: {severity: critical, area: concept_drift, job: sentrix_pipeline, batch: "2025-11"}
+            exp_annotations:
+              summary: "AUC abaixo do limite no lote 2025-11"
+              description: "AUC = 0.700, mais de 0.05 abaixo do baseline."
+      - eval_time: 30s
+        alertname: SentrixLabelDrift
+        exp_alerts:
+          - exp_labels: {severity: warning, area: label_drift, job: sentrix_pipeline, batch: "2025-12"}
+            exp_annotations:
+              summary: "Taxa de default mudou no lote 2025-12"
+              description: "Desvio absoluto de 15.7% vs. referência."
+
+  # 5. Fairness: 0.75 violates the four-fifths rule, 0.93 does not.
+  - interval: 15s
+    input_series:
+      - series: 'credit_disparate_impact{job="sentrix_pipeline",batch="2025-12"}'
+        values: "0.93x4"
+      - series: 'credit_disparate_impact{job="sentrix_pipeline",batch="simulado"}'
+        values: "0.75x4"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: SentrixFairnessDisparateImpact
+        exp_alerts:
+          - exp_labels: {severity: warning, area: fairness, job: sentrix_pipeline, batch: simulado}
+            exp_annotations:
+              summary: "Disparate impact abaixo de 0.80 no lote simulado"
+              description: "Razão de aprovação entre grupos = 0.75 (regra dos 4/5)."
+
+  # 6. Stale pipeline: last success at t=0 -> alert only after 35 days.
+  - interval: 1d
+    input_series:
+      - series: 'credit_pipeline_last_success_timestamp_seconds{job="sentrix_pipeline"}'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 30d
+        alertname: SentrixPipelineStale
+        exp_alerts: []
+      - eval_time: 36d
+        alertname: SentrixPipelineStale
+        exp_alerts:
+          - exp_labels: {severity: warning, area: operations, job: sentrix_pipeline}
+            exp_annotations:
+              summary: "Pipeline de monitoramento sem execução há mais de 35 dias"
+              description: "Lotes mensais podem não estar sendo monitorados."
+
+  # 7. Pushgateway down must persist for 1 minute before firing.
+  - interval: 15s
+    input_series:
+      - series: 'up{job="pushgateway",instance="pushgateway:9091"}'
+        values: "0x10"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: SentrixPushgatewayDown
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: SentrixPushgatewayDown
+        exp_alerts:
+          - exp_labels: {severity: critical, area: operations, job: pushgateway, instance: "pushgateway:9091"}
+            exp_annotations:
+              summary: "Pushgateway fora do ar"
+              description: "Métricas do pipeline não estão chegando ao Prometheus."
