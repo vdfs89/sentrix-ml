@@ -12,7 +12,7 @@ Formato inspirado em *Model Cards for Model Reporting* (Mitchell et al., 2019). 
 | Threshold de decisão | 0,23 (maximiza F1 no holdout). PD ≥ 0,23 → recusa |
 | Treinado em | 2026-11-23, sobre 12.000 linhas (80% da referência), seed 42 |
 | Linhagem | hash SHA-256 dos dados de referência `5e6943cc2ddabb82…` em `models/model_metadata.json` e no MLflow (`sentrix-training`) |
-| Responsáveis | Grupo do Tech Challenge Fase 4 — PosTech MLE FIAP |
+| Responsável | Vitor Diogo Fonseca da Silva (RM375157) — Tech Challenge Fase 4, PosTech MLE FIAP |
 
 ## 2. Uso pretendido
 

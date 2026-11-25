@@ -8,6 +8,8 @@
 
 Projeto desenvolvido para o **Tech Challenge — Fase 4** da Pós-Tech em Machine Learning Engineering da FIAP.
 
+**Autor:** Vitor Diogo Fonseca da Silva — RM375157 (projeto individual)
+
 Plataforma de observabilidade contínua para modelos de Credit Scoring, contemplando validação de dados, detecção de Data Drift e Concept Drift, monitoramento operacional e governança de dados.
 
 Uma fintech de crédito tem um modelo de *credit scoring* em produção. Com inflação e novos perfis de clientes, a diretoria suspeita que ele está degradando em silêncio. Este repositório constrói a **camada de sustentação e confiabilidade** em volta desse modelo:
