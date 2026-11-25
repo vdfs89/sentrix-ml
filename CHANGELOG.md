@@ -6,6 +6,22 @@ Versões independentes:
 - **Projeto SENTRIX** — tags git `vX.Y.Z` e `src/__init__.py::__version__`.
 - **Modelo** `credit-scoring-xgb` — `models/model_metadata.json::version` (muda só quando o modelo é retreinado).
 
+## [1.2.0] — 2026-11-25
+
+### Adicionado
+- `python -m src.technical_findings`: evidência reproduzível dos achados técnicos (`reports/technical_findings.json`).
+- Seção **Achados técnicos (errata)** no README:
+  - o PSI do Evidently usa bins de largura igual (Sturges), e não quantis como diz a docstring, e subestima `pay_amt1` (0,03 contra 0,47);
+  - falso positivo do KS sob hipótese nula: 36,5% dos lotes, contra 0% do PSI;
+  - precisão e recall de PSI e KS contra o gabarito da simulação;
+  - tempo até o primeiro alerta de cada tipo.
+- Teste de integração: a detecção sinaliza só as features alteradas intencionalmente.
+- `docs/MODEL_CARD.md` com desempenho por subgrupo, limitações e política de retreino.
+- `docs/SPEC.md` com rastreabilidade requisito → implementação → evidência → teste.
+
+### Identificado
+- Risco de viés etário: no holdout, a razão de aprovação 50+ / 30–39 é 0,76 (< 0,80). Está documentado no Model Card e no README, com ações planejadas.
+
 ## [1.1.0] — 2026-11-23
 
 ### Adicionado
@@ -35,5 +51,6 @@ Versões independentes:
 - README com governança e LGPD e CI no GitHub Actions.
 - Identidade SENTRIX e capa.
 
+[1.2.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/vdfs89/sentrix-ml/releases/tag/v1.0.0
