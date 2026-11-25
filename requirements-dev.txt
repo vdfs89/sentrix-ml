@@ -1,0 +1,2 @@
+# Development tooling (lint/format). Runtime + test dependencies are in requirements.txt.
+ruff==0.17.6
