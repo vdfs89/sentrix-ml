@@ -23,6 +23,8 @@ Uma fintech de crédito tem um modelo de *credit scoring* em produção. Com inf
 
 > 🎥 **Vídeo STAR (≤ 5 min):** _adicionar link aqui_
 
+🌐 **Portal do projeto:** https://vdfs89.github.io/sentrix-ml/ — dashboard de monitoramento e relatórios Evidently de cada mês, publicados pelo CD
+
 📄 [Model Card](docs/MODEL_CARD.md) · [SPEC — requisitos e rastreabilidade](docs/SPEC.md) · [CHANGELOG](CHANGELOG.md)
 
 ---
@@ -56,7 +58,7 @@ pip install -r requirements.txt
 export CREDIT_PII_SALT="um-segredo-forte"
 
 python -m src.pipeline          # ingestão → treino → simulação → monitoramento → relatórios (~30 s)
-pytest -q                       # 18 testes: contratos, estatística e precisão do drift, regras de alerta, métricas
+pytest -q                       # 20 testes: contratos, estatística e precisão do drift, regras de alerta, métricas
 
 mlflow ui --backend-store-uri sqlite:///mlflow.db   # http://127.0.0.1:5000
 ```
@@ -71,13 +73,14 @@ Os mesmos alvos funcionam com `make <alvo>` (Linux, macOS, WSL e CI) e com `.\ma
 |---|---|
 | `install` | instala as dependências fixadas (`requirements.txt` + `requirements-dev.txt`) |
 | `lint` / `format` | Ruff: checagem de lint e formatação / correção automática |
-| `test` | 18 testes (pytest) |
+| `test` | 20 testes (pytest) |
 | `pipeline` / `monitor` | pipeline completo / só monitoramento (envia ao Pushgateway se a stack estiver no ar) |
 | `findings` | reproduz as evidências da seção Achados técnicos |
 | `promtool` | valida e testa as regras de alerta do Prometheus |
 | `up` / `down` / `logs` | sobe, derruba e acompanha a stack Docker |
 | `push` / `dashboard` | reenvia métricas / regenera o JSON do Grafana |
 | `check` | `lint` + `test` + `promtool`: tudo o que o CI checa |
+| `site` / `serve` | gera o portal do GitHub Pages em `site/` / gera e serve em http://127.0.0.1:8765 |
 | `ci` | `check` + `pipeline` |
 
 ### Stack de observabilidade (Docker)
@@ -101,7 +104,24 @@ As portas do host fogem de 3000/9090 para a stack rodar ao lado de outros projet
 docker run --rm -v "$PWD/monitoring/prometheus:/rules" -w /rules --entrypoint promtool prom/prometheus:v2.55.1 test rules alerts_test.yml
 ```
 
-O CI (`.github/workflows/ci.yml`) roda pelos mesmos alvos do `Makefile`, em três jobs: **lint** (`make lint`: Ruff check + format), **alert-rules** (`make promtool` e verificação de que o JSON do Grafana está em sincronia com o gerador) e **test-and-monitor** (só depois dos dois anteriores: `make test` + `make pipeline`, com os relatórios publicados como artefato).
+### CI/CD (GitHub Actions)
+
+```mermaid
+flowchart LR
+    T[push main · PR · cron mensal · manual] --> L[lint<br/>Ruff]
+    T --> A[alert-rules<br/>promtool + sync Grafana]
+    L & A --> M[test-and-monitor<br/>pytest + pipeline + portal]
+    M -->|main| P[deploy-pages<br/>GitHub Pages]
+    TAG[tag vX.Y.Z] --> R[release<br/>notas do CHANGELOG + evidências .zip]
+```
+
+| Workflow | Quando | O que faz |
+|---|---|---|
+| **CI** `ci.yml` › `lint`, `alert-rules`, `test-and-monitor` | push na `main`, pull request, cron mensal (dia 1, 06:00 UTC) e manual | `make lint`; `make promtool` + verificação do JSON do Grafana; depois dos dois, `make test`, `make pipeline` e `make site`, com relatórios e logs publicados como artefato |
+| **CD** `ci.yml` › `deploy-pages` | só na `main` (push, cron, manual) | publica o portal no **GitHub Pages**: https://vdfs89.github.io/sentrix-ml/ |
+| **CD** `release.yml` | cada tag `vX.Y.Z` | cria a **GitHub Release** com a seção da versão no `CHANGELOG.md` e anexa `reports/`, `logs/` e os metadados do modelo num `.zip` |
+
+O cron mensal simula a operação real: todo mês o pipeline roda do zero, gera os relatórios e republica o portal. O link do vídeo no portal vem da variável `SENTRIX_VIDEO_URL` (Settings › Variables do repositório).
 
 ---
 
@@ -470,6 +490,7 @@ Uma atualização do Docker Desktop reiniciou o engine e o Pushgateway voltou co
 │   ├── dashboard.py         # dashboard HTML (Plotly)
 │   ├── logging_utils.py     # logs JSON estruturados
 │   ├── push_metrics.py      # reenvia o último run ao Pushgateway
+│   ├── portal.py            # portal HTML do GitHub Pages
 │   ├── technical_findings.py # evidências da seção Achados técnicos
 │   └── pipeline.py          # orquestração ponta a ponta
 ├── tests/                   # pytest
@@ -480,18 +501,19 @@ Uma atualização do Docker Desktop reiniciou o engine e o Pushgateway voltou co
 │   ├── prometheus/          # prometheus.yml, alerts.yml (11 regras), alerts_test.yml (promtool)
 │   └── grafana/             # provisioning, dashboards/sentrix.json, generate_dashboard.py
 ├── docker-compose.yml       # Pushgateway + Prometheus + Grafana
+├── site/ (gerado)           # portal do GitHub Pages (python -m src.portal)
 ├── Makefile · make.ps1      # atalhos (Linux/CI · Windows)
 ├── pyproject.toml           # configuração do Ruff e do pytest
 ├── docs/                    # MODEL_CARD.md, SPEC.md, capa
 ├── CHANGELOG.md
-└── .github/workflows/ci.yml
+└── .github/workflows/        # ci.yml (CI + deploy Pages), release.yml (releases por tag)
 ```
 
 ## Versionamento
 
 | O quê | Versão | Onde |
 |---|---|---|
-| Projeto SENTRIX | **1.3.0** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0` … `v1.3.0` · `pyproject.toml` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
+| Projeto SENTRIX | **1.4.0** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0` … `v1.4.0` e [Releases](https://github.com/vdfs89/sentrix-ml/releases) · `pyproject.toml` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
 | Modelo `credit-scoring-xgb` | 1.0.0 | `models/model_metadata.json` + MLflow (com hash SHA-256 dos dados de treino) |
 | Contrato de dados | `credit_scoring_input_contract_v1` | `src/contracts.py` |
 | Python | 3.11 | CI e ambiente local |
