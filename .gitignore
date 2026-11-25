@@ -15,3 +15,6 @@ mlruns/
 
 # Secrets
 .env
+
+# GitHub Pages build output (python -m src.portal), deployed by CI
+site/
