@@ -1,7 +1,7 @@
 {
   "model_name": "credit-scoring-xgb",
   "version": "1.0.0",
-  "trained_at": "2026-11-23T10:14:01.248039+00:00",
+  "trained_at": "2026-11-25T16:58:06.595713+00:00",
   "features": [
     "limit_bal",
     "education",
@@ -30,6 +30,8 @@
     "marriage"
   ],
   "threshold": 0.23,
+  "threshold_policy": "fixed business policy (config.DECISION_THRESHOLD)",
+  "f1_optimal_threshold": 0.23,
   "params": {
     "n_estimators": 300,
     "max_depth": 4,

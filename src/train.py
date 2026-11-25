@@ -88,7 +88,9 @@ def run_training() -> dict:
         train_seconds = time.perf_counter() - t0
 
         proba_test = model.predict_proba(test_df[config.FEATURES])[:, 1]
-        threshold = _best_threshold(test_df[config.TARGET].to_numpy(), proba_test)
+        # Policy threshold is fixed (config.DECISION_THRESHOLD); the F1-optimal one is informative only.
+        f1_optimal_threshold = _best_threshold(test_df[config.TARGET].to_numpy(), proba_test)
+        threshold = config.DECISION_THRESHOLD
         metrics = classification_metrics(test_df[config.TARGET].to_numpy(), proba_test, threshold)
 
         model.save_model(config.MODEL_FILE)
@@ -109,6 +111,8 @@ def run_training() -> dict:
             "features": config.FEATURES,
             "excluded_protected_attributes": config.PROTECTED_ATTRIBUTES,
             "threshold": threshold,
+            "threshold_policy": "fixed business policy (config.DECISION_THRESHOLD)",
+            "f1_optimal_threshold": f1_optimal_threshold,
             "params": PARAMS,
             "reference_rows": len(reference),
             "reference_data_sha256": data_hash,
@@ -134,6 +138,7 @@ def run_training() -> dict:
             mlflow.log_params({**PARAMS, "threshold": threshold, "n_features": len(config.FEATURES)})
             mlflow.log_metrics({f"holdout_{k}": v for k, v in metrics.items()})
             mlflow.log_metric("train_seconds", train_seconds)
+            mlflow.log_metric("f1_optimal_threshold", f1_optimal_threshold)
             mlflow.log_artifact(str(config.MODEL_FILE), artifact_path="model")
             mlflow.log_artifact(str(config.MODEL_META_FILE), artifact_path="model")
             mlflow.log_dict(importances, "feature_importance.json")

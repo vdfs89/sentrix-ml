@@ -65,6 +65,13 @@ FEATURES = ["limit_bal", "education", "age", *PAY_STATUS, *BILL_AMT, *PAY_AMT]
 CATEGORICAL_FEATURES = ["education", *PAY_STATUS]
 NUMERICAL_FEATURES = [c for c in FEATURES if c not in CATEGORICAL_FEATURES]
 
+# --- Credit policy --------------------------------------------------------------------------
+# Decision threshold (PD >= threshold -> decline) is a versioned BUSINESS POLICY, not a value
+# re-optimised on every training run: the F1-optimal point moved from 0.23 to 0.26 between
+# Windows and Linux builds of the same model, swinging approval by up to 6.9 p.p.
+# (README > Achados técnicos A8). The F1-optimal value is still computed and logged for review.
+DECISION_THRESHOLD = 0.23
+
 # --- Drift / alert thresholds ---------------------------------------------------------------
 PSI_WARNING = 0.10
 PSI_CRITICAL = 0.20
