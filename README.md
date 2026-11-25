@@ -71,7 +71,7 @@ pip install -r requirements.txt
 export CREDIT_PII_SALT="um-segredo-forte"
 
 python -m src.pipeline          # ingestão → treino → simulação → monitoramento → relatórios (~30 s)
-pytest -q                       # 20 testes: contratos, estatística e precisão do drift, regras de alerta, métricas
+pytest -q                       # 24 testes: contratos, drift, alertas, métricas, portal, reprodutibilidade
 
 mlflow ui --backend-store-uri sqlite:///mlflow.db   # http://127.0.0.1:5000
 ```
@@ -86,7 +86,7 @@ Os mesmos alvos funcionam com `make <alvo>` (Linux, macOS, WSL e CI) e com `.\ma
 |---|---|
 | `install` | instala as dependências fixadas (`requirements.txt` + `requirements-dev.txt`) |
 | `lint` / `format` | Ruff: checagem de lint e formatação / correção automática |
-| `test` | 20 testes (pytest) |
+| `test` | 24 testes (pytest) |
 | `pipeline` / `monitor` | pipeline completo / só monitoramento (envia ao Pushgateway se a stack estiver no ar) |
 | `findings` | reproduz as evidências da seção Achados técnicos |
 | `promtool` | valida e testa as regras de alerta do Prometheus |
@@ -174,7 +174,7 @@ Cada etapa é instrumentada pelo context manager `stage()` (`src/logging_utils.p
 * **Separação clara** (embaralhamento com seed 42):
   * **Referência** — 15.000 linhas, meses `2025-01..2025-06` (era de treino). Treino 80% / holdout 20%, estratificado.
   * **Produção** — 14.965 linhas divididas em 6 lotes mensais `2025-07..2025-12`, onde o drift é injetado. **O modelo nunca vê esses dados no treino.**
-* **Modelo baseline:** XGBoost (300 árvores, profundidade 4), 21 features, sem atributos protegidos. Threshold de decisão 0,23 escolhido por F1 no holdout.
+* **Modelo baseline:** XGBoost (300 árvores, profundidade 4), 21 features, sem atributos protegidos. Threshold de decisão **0,23 fixo como política de crédito** (coincide com o ótimo de F1 no holdout, mas não é reotimizado a cada treino; ver [A8](#a8--o-mesmo-modelo-não-é-igual-no-windows-e-no-linux-e-o-threshold-otimizado-mudava-a-política-de-crédito)).
 
 | Métrica no holdout de referência | Valor |
 |---|---|
@@ -474,6 +474,26 @@ Prometheus e Grafana da Fase 3 já ocupavam 9090/3000. A stack SENTRIX usa 9190/
 
 Uma atualização do Docker Desktop reiniciou o engine e o Pushgateway voltou com **0 métricas**: por padrão ele guarda tudo em memória, então o painel ficaria vazio até a próxima execução do pipeline. A correção foi `--persistence.file` em um volume. Na primeira tentativa, o volume montado em `/data` deu `permission denied`, porque o processo roda como `nobody` e o volume pertencia ao root. A versão final monta em `/pushgateway`, diretório que já é do `nobody` na imagem. Validado: 196 métricas presentes depois de `docker compose restart pushgateway`.
 
+### A8 — O mesmo modelo não é igual no Windows e no Linux, e o threshold "otimizado" mudava a política de crédito
+
+O primeiro deploy do portal mostrou AUCs um pouco diferentes das do README: dez/25 deu 0,688 no CI e 0,683 local. A investigação, passo a passo:
+
+1. **Os dados são idênticos:** as mesmas linhas, o mesmo hash da referência e o PSI de todas as features igual até a última casa. A ingestão e a simulação são determinísticas.
+2. **O modelo não é:** treinando o XGBoost 3.2.0 com os mesmos dados e a mesma seed, 1, 4 e todas as threads geram três modelos diferentes na mesma máquina. Mesmo com `n_jobs=1`, Windows e Linux divergem (PD médio no holdout de 0,22184 contra 0,22250), por causa do compilador e das instruções SIMD de cada build. **Reprodutibilidade bit a bit entre plataformas não é alcançável** com essa biblioteca.
+3. **O efeito na operação:**
+   * o PSI do score de nov/25 foi de 0,194 para 0,204 e **cruzou o limite de 0,20**, e o alerta de prediction drift virou CRITICAL em vez de WARNING;
+   * mais grave: o threshold escolhido como ótimo de F1 num grid de 0,01 saltou de **0,23 para 0,26**, porque a curva de F1 é achatada perto do máximo, e **a taxa de aprovação subiu de 3,7 a 6,9 p.p.** em todos os meses. Em crédito, isso é a política de concessão mudando sozinha a cada retreino.
+
+**Correções:**
+* O threshold virou **parâmetro de política versionado** (`config.DECISION_THRESHOLD = 0.23`). O ótimo por F1 continua sendo calculado e registrado no MLflow (`f1_optimal_threshold`), só para revisão humana.
+* `src/reproducibility.py` roda no CI e compara a execução com a evidência versionada:
+  * dados e PSI precisam bater exatamente;
+  * AUC (±0,01), PSI do score (±0,02), aprovação (±3 p.p.) e PD médio (±0,01) precisam ficar dentro da tolerância;
+  * um alerta dependente do modelo que mude de severidade na fronteira é reportado, mas não reprova.
+* O portal publica a **evidência versionada**, com os mesmos números do README. A execução do CI fica como artefato (`reproducibility.txt`).
+
+**Lição:** o alerta e a decisão de negócio precisam ser robustos ao ruído numérico do modelo. Para alertas, isso significa histerese ou banda de tolerância perto dos limites. Para a decisão, um threshold definido pela política de crédito, e não pelo argmax de uma métrica.
+
 ---
 
 ## Lições aprendidas
@@ -526,7 +546,7 @@ Uma atualização do Docker Desktop reiniciou o engine e o Pushgateway voltou co
 
 | O quê | Versão | Onde |
 |---|---|---|
-| Projeto SENTRIX | **1.4.0** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0` … `v1.4.0` e [Releases](https://github.com/vdfs89/sentrix-ml/releases) · `pyproject.toml` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
+| Projeto SENTRIX | **1.5.0** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0` … `v1.5.0` e [Releases](https://github.com/vdfs89/sentrix-ml/releases) · `pyproject.toml` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
 | Modelo `credit-scoring-xgb` | 1.0.0 | `models/model_metadata.json` + MLflow (com hash SHA-256 dos dados de treino) |
 | Contrato de dados | `credit_scoring_input_contract_v1` | `src/contracts.py` |
 | Python | 3.11 | CI e ambiente local |

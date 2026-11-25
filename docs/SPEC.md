@@ -53,7 +53,7 @@ Legenda: ✅ atendido · ➕ além do pedido.
 
 | ID | Requisito | Decisão |
 |---|---|---|
-| NF-01 | Reprodutibilidade | seed 42, versões exatas (`requirements.txt`), imagens Docker com tag fixa. Pipeline do zero gera os mesmos números |
+| NF-01 | Reprodutibilidade | seed 42, versões exatas (`requirements.txt`), imagens Docker com tag fixa. Na mesma plataforma, o pipeline do zero gera números idênticos. Entre plataformas, os dados e o PSI batem exatamente, e as métricas do modelo ficam dentro de uma tolerância verificada no CI por `src/reproducibility.py` (README › A8) |
 | NF-02 | Privacy by Default | PII pseudonimizada na ingestão; schema estrito (R9); `data/` e audit store fora do git; logs sem PII |
 | NF-03 | Monitoramento não pode derrubar o pipeline | falha no Pushgateway só gera WARNING (`export_prometheus`) |
 | NF-04 | Alertas como código testado | `alerts.yml` + `alerts_test.yml` (promtool) no CI, paridade de 36 alertas com o relatório Python |

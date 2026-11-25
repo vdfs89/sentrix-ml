@@ -9,7 +9,7 @@ Formato inspirado em *Model Cards for Model Reporting* (Mitchell et al., 2019). 
 | Nome / versão | `credit-scoring-xgb` 1.0.0 |
 | Tipo | Classificação binária: probabilidade de inadimplência (PD) no mês seguinte |
 | Algoritmo | XGBoost 3.2.0 — 300 árvores, profundidade 4, learning rate 0,05, subsample/colsample 0,8 |
-| Threshold de decisão | 0,23 (maximiza F1 no holdout). PD ≥ 0,23 → recusa |
+| Threshold de decisão | **0,23, fixo como política de crédito versionada** (`config.DECISION_THRESHOLD`). PD ≥ 0,23 → recusa. O ótimo por F1 no holdout é recalculado a cada treino só como informação (hoje também 0,23), ver README › A8 |
 | Treinado em | 2026-11-23, sobre 12.000 linhas (80% da referência), seed 42 |
 | Linhagem | hash SHA-256 dos dados de referência `5e6943cc2ddabb82…` em `models/model_metadata.json` e no MLflow (`sentrix-training`) |
 | Responsável | Vitor Diogo Fonseca da Silva (RM375157) — Tech Challenge Fase 4, PosTech MLE FIAP |
