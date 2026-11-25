@@ -6,6 +6,16 @@ Versões independentes:
 - **Projeto SENTRIX** — tags git `vX.Y.Z` e `src/__init__.py::__version__`.
 - **Modelo** `credit-scoring-xgb` — `models/model_metadata.json::version` (muda só quando o modelo é retreinado).
 
+## [1.3.0] — 2026-11-25
+
+### Adicionado
+- `Makefile` (Linux, macOS, WSL e CI) e `make.ps1` (Windows) com os mesmos alvos: `install`, `lint`, `format`, `test`, `pipeline`, `monitor`, `findings`, `promtool`, `up`, `down`, `logs`, `push`, `dashboard`, `check`, `ci` e `clean`.
+- `pyproject.toml` com a configuração do Ruff (regras E, W, F, I, B, UP, SIM e N) e do pytest. `requirements-dev.txt` com o Ruff 0.17.6.
+- Job **lint** no CI. Agora o CI roda pelos alvos do `make`, e `test-and-monitor` só começa depois de `lint` e `alert-rules`.
+
+### Alterado
+- Código formatado com `ruff format`, e o lint foi corrigido: `zip(..., strict=True)` e `datetime.UTC`. Os resultados do pipeline são idênticos aos da versão anterior (verificado campo a campo).
+
 ## [1.2.1] — 2026-11-25
 
 ### Corrigido
@@ -56,6 +66,7 @@ Versões independentes:
 - README com governança e LGPD e CI no GitHub Actions.
 - Identidade SENTRIX e capa.
 
+[1.3.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/vdfs89/sentrix-ml/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.0.0...v1.1.0
