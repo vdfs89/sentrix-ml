@@ -41,6 +41,10 @@ $Targets = [ordered]@{
     findings  = @{ Desc = "Reproduce the evidence of README > Technical findings"; Run = { Invoke-Step $Python @("-m", "src.technical_findings") } }
     push      = @{ Desc = "Re-send the last run's metrics to the Pushgateway"; Run = { Invoke-Pushing @("-m", "src.push_metrics") } }
     dashboard = @{ Desc = "Regenerate the Grafana dashboard JSON from code"; Run = { Invoke-Step $Python @("monitoring/grafana/generate_dashboard.py") } }
+    site      = @{ Desc = "Build the GitHub Pages portal into site/ (needs a pipeline run)"; Run = { Invoke-Step $Python @("-m", "src.portal") } }
+    serve     = @{ Desc = "Build and serve the portal at http://127.0.0.1:8765"; Run = {
+                    & $Targets["site"].Run
+                    Invoke-Step $Python @("-m", "http.server", "8765", "--bind", "127.0.0.1", "-d", "site") } }
     promtool  = @{ Desc = "Validate and unit-test the Prometheus alert rules"; Run = {
                     foreach ($cmd in @(@("check", "rules", "alerts.yml"), @("test", "rules", "alerts_test.yml"))) {
                         Invoke-Step "docker" (@("run", "--rm", "-v", "${RulesDir}:/rules", "-w", "/rules", "--entrypoint", "promtool", $PromImage) + $cmd)
@@ -52,7 +56,7 @@ $Targets = [ordered]@{
                     foreach ($t in "lint", "test", "promtool") { & $Targets[$t].Run } } }
     ci        = @{ Desc = "check + full pipeline"; Run = { & $Targets["check"].Run; & $Targets["pipeline"].Run } }
     clean     = @{ Desc = "Remove caches (keeps data, models, reports)"; Run = {
-                    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$Root\.pytest_cache", "$Root\.ruff_cache"
+                    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$Root\.pytest_cache", "$Root\.ruff_cache", "$Root\site"
                     Get-ChildItem $Root -Recurse -Directory -Filter "__pycache__" |
                         Where-Object { $_.FullName -notlike "*\.venv\*" } |
                         Remove-Item -Recurse -Force } }

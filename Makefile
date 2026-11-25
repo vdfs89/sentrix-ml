@@ -8,7 +8,7 @@ PROM_IMAGE  ?= prom/prometheus:v2.55.1
 RULES_DIR   := $(CURDIR)/monitoring/prometheus
 
 .DEFAULT_GOAL := help
-.PHONY: help install lint format test pipeline monitor findings push dashboard \
+.PHONY: help install lint format test pipeline monitor findings push dashboard site serve \
         promtool up down logs check ci clean
 
 help: ## List available targets
@@ -43,6 +43,12 @@ push: ## Re-send the last run's metrics to the Pushgateway
 dashboard: ## Regenerate the Grafana dashboard JSON from code
 	$(PYTHON) monitoring/grafana/generate_dashboard.py
 
+site: ## Build the GitHub Pages portal into site/ (needs a pipeline run)
+	$(PYTHON) -m src.portal
+
+serve: site ## Build and serve the portal at http://127.0.0.1:8765
+	$(PYTHON) -m http.server 8765 --bind 127.0.0.1 -d site
+
 promtool: ## Validate and unit-test the Prometheus alert rules
 	docker run --rm -v "$(RULES_DIR):/rules" -w /rules --entrypoint promtool $(PROM_IMAGE) check rules alerts.yml
 	docker run --rm -v "$(RULES_DIR):/rules" -w /rules --entrypoint promtool $(PROM_IMAGE) test rules alerts_test.yml
@@ -61,5 +67,5 @@ check: lint test promtool ## Everything CI checks, locally
 ci: check pipeline ## check + full pipeline
 
 clean: ## Remove caches (keeps data, models, reports)
-	rm -rf .pytest_cache .ruff_cache
+	rm -rf .pytest_cache .ruff_cache site
 	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} +
