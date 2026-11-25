@@ -52,16 +52,29 @@ jobs:
       - run: make install
       - name: Unit and integration tests (contracts, drift, alert metrics)
         run: make test
+      - name: Keep the versioned evidence as reproducibility baseline
+        run: |
+          mkdir -p "$RUNNER_TEMP/baseline"
+          cp reports/monitoring_records.json reports/alerts.json models/model_metadata.json "$RUNNER_TEMP/baseline/"
       - name: Full sustainment pipeline (no Pushgateway in CI)
         run: make pipeline PUSHGATEWAY=
-      - name: Build project portal
-        run: make site
+      - name: Reproducibility check vs. versioned evidence (README > A8)
+        run: |
+          python -m src.reproducibility "$RUNNER_TEMP/baseline/monitoring_records.json" \
+            "$RUNNER_TEMP/baseline/alerts.json" "$RUNNER_TEMP/baseline/model_metadata.json" \
+            | tee reproducibility.txt
       - uses: actions/upload-artifact@v4
         with:
           name: monitoring-reports
           path: |
             reports/
             logs/pipeline.jsonl
+            models/model_metadata.json
+            reproducibility.txt
+      - name: Build project portal from the versioned evidence (same numbers as the README)
+        run: |
+          git checkout -- reports logs models
+          make site
       - name: Upload portal for GitHub Pages
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
