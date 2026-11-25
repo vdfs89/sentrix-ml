@@ -59,6 +59,29 @@ def test_pseudonymization_is_deterministic_and_irreversible_looking():
     assert a == b and "12345678900" not in a and len(a) == 20
 
 
+def test_detection_flags_only_intentionally_drifted_features():
+    """Integration: simulate the December scenario on a synthetic credit base and check that
+    PSI flags exactly the shifted features (precision 100%) and leaves the others stable."""
+    rng = np.random.default_rng(7)
+    n = 12_000
+    base = pd.DataFrame({
+        "limit_bal": rng.choice(np.arange(1, 51) * 10_000.0, n),
+        "age": rng.integers(21, 70, n),
+        "pay_0": rng.choice([-2, -1, 0, 1, 2], n, p=[.1, .2, .5, .1, .1]),
+        **{c: rng.lognormal(10, 1.2, n).round() for c in config.BILL_AMT},
+        **{c: rng.lognormal(8, 1.3, n).round() for c in config.PAY_AMT},
+        config.TARGET: rng.integers(0, 2, n),
+    })
+    ref, cur = base.iloc[:9_000], base.iloc[9_000:]
+    drifted, _ = apply_data_drift(cur, inflation=1.0, new_profile_share=0.4, rng=np.random.default_rng(8))
+
+    psi_values = {c: psi(ref[c], drifted[c]) for c in ["pay_0", *config.PAY_AMT, "age", "limit_bal"]}
+    assert psi_values["pay_0"] < config.PSI_WARNING                      # untouched -> stable
+    assert all(psi_values[c] >= config.PSI_CRITICAL for c in config.PAY_AMT)
+    assert psi_values["age"] >= config.PSI_CRITICAL
+    assert psi_values["limit_bal"] >= config.PSI_WARNING
+
+
 def test_alert_rules():
     batch = {"batch": "x", "validation_passed": True, "psi": {"age": 0.3, "pay_amt1": 0.12},
              "drift_share": 0.4, "prediction_psi": 0.05, "auc": 0.70,
