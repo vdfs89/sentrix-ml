@@ -61,6 +61,23 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db   # http://127.0.0.1:5000
 
 Depois de rodar, abra **`reports/monitoring_dashboard.html`** no navegador. Etapas isoladas: `python -m src.ingestion`, `python -m src.train`, `python -m src.drift_simulation`, `python -m src.pipeline --monitor`.
 
+### Atalhos (`Makefile` / `make.ps1`)
+
+Os mesmos alvos funcionam com `make <alvo>` (Linux, macOS, WSL e CI) e com `.\make.ps1 <alvo>` (Windows sem make):
+
+| Alvo | O que faz |
+|---|---|
+| `install` | instala as dependências fixadas (`requirements.txt` + `requirements-dev.txt`) |
+| `lint` / `format` | Ruff: checagem de lint e formatação / correção automática |
+| `test` | 18 testes (pytest) |
+| `pipeline` / `monitor` | pipeline completo / só monitoramento (envia ao Pushgateway se a stack estiver no ar) |
+| `findings` | reproduz as evidências da seção Achados técnicos |
+| `promtool` | valida e testa as regras de alerta do Prometheus |
+| `up` / `down` / `logs` | sobe, derruba e acompanha a stack Docker |
+| `push` / `dashboard` | reenvia métricas / regenera o JSON do Grafana |
+| `check` | `lint` + `test` + `promtool`: tudo o que o CI checa |
+| `ci` | `check` + `pipeline` |
+
 ### Stack de observabilidade (Docker)
 
 ```bash
@@ -82,7 +99,7 @@ As portas do host fogem de 3000/9090 para a stack rodar ao lado de outros projet
 docker run --rm -v "$PWD/monitoring/prometheus:/rules" -w /rules --entrypoint promtool prom/prometheus:v2.55.1 test rules alerts_test.yml
 ```
 
-O CI (`.github/workflows/ci.yml`) tem dois jobs: **alert-rules** (`promtool check` + `promtool test` e verificação de que o JSON do Grafana está em sincronia com o gerador) e **test-and-monitor** (pytest + pipeline completo, relatórios publicados como artefato).
+O CI (`.github/workflows/ci.yml`) roda pelos mesmos alvos do `Makefile`, em três jobs: **lint** (`make lint`: Ruff check + format), **alert-rules** (`make promtool` e verificação de que o JSON do Grafana está em sincronia com o gerador) e **test-and-monitor** (só depois dos dois anteriores: `make test` + `make pipeline`, com os relatórios publicados como artefato).
 
 ---
 
@@ -461,6 +478,8 @@ Uma atualização do Docker Desktop reiniciou o engine e o Pushgateway voltou co
 │   ├── prometheus/          # prometheus.yml, alerts.yml (11 regras), alerts_test.yml (promtool)
 │   └── grafana/             # provisioning, dashboards/sentrix.json, generate_dashboard.py
 ├── docker-compose.yml       # Pushgateway + Prometheus + Grafana
+├── Makefile · make.ps1      # atalhos (Linux/CI · Windows)
+├── pyproject.toml           # configuração do Ruff e do pytest
 ├── docs/                    # MODEL_CARD.md, SPEC.md, capa
 ├── CHANGELOG.md
 └── .github/workflows/ci.yml
@@ -470,11 +489,11 @@ Uma atualização do Docker Desktop reiniciou o engine e o Pushgateway voltou co
 
 | O quê | Versão | Onde |
 |---|---|---|
-| Projeto SENTRIX | **1.2.1** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
+| Projeto SENTRIX | **1.3.0** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0` … `v1.3.0` · `pyproject.toml` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
 | Modelo `credit-scoring-xgb` | 1.0.0 | `models/model_metadata.json` + MLflow (com hash SHA-256 dos dados de treino) |
 | Contrato de dados | `credit_scoring_input_contract_v1` | `src/contracts.py` |
 | Python | 3.11 | CI e ambiente local |
-| Dependências Python | versões exatas | `requirements.txt` (pandas 2.3.3, scikit-learn 1.9.1, XGBoost 3.2.0, Pandera 0.36.0, Evidently 0.7.23, MLflow 3.18.0, prometheus-client 0.26.0…) |
+| Dependências Python | versões exatas | `requirements.txt` (pandas 2.3.3, scikit-learn 1.9.1, XGBoost 3.2.0, Pandera 0.36.0, Evidently 0.7.23, MLflow 3.18.0, prometheus-client 0.26.0…) · `requirements-dev.txt` (Ruff 0.17.6) |
 | Imagens Docker | tags fixas | Prometheus v2.55.1 · Pushgateway v1.9.0 · Grafana 11.3.0 |
 
 Projeto, modelo e contrato têm versões independentes: mudar o dashboard não muda o modelo, e retreinar o modelo não muda o contrato.
