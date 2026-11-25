@@ -8,6 +8,13 @@ name: sentrix
 services:
   pushgateway:
     image: prom/pushgateway:v1.9.0
+    # Pushgateway keeps metrics in memory by default: a Docker restart wiped every pushed batch.
+    # Persisting to a volume keeps the last pipeline state across restarts.
+    command:
+      - --persistence.file=/pushgateway/metrics
+      - --persistence.interval=1m
+    volumes:
+      - pushgateway-data:/pushgateway   # dir owned by "nobody" in the image (Pushgateway runs as nobody)
     ports: ["${SENTRIX_PUSHGATEWAY_PORT:-9091}:9091"]
     restart: unless-stopped
 
@@ -42,5 +49,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  pushgateway-data:
   prometheus-data:
   grafana-data:
