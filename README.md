@@ -21,6 +21,8 @@ Uma fintech de crédito tem um modelo de *credit scoring* em produção. Com inf
 
 > 🎥 **Vídeo STAR (≤ 5 min):** _adicionar link aqui_
 
+📄 [Model Card](docs/MODEL_CARD.md) · [SPEC — requisitos e rastreabilidade](docs/SPEC.md) · [CHANGELOG](CHANGELOG.md)
+
 ---
 
 ## Sumário
@@ -32,9 +34,10 @@ Uma fintech de crédito tem um modelo de *credit scoring* em produção. Com inf
 6. [Etapa 3 — Observabilidade](#etapa-3--observabilidade-de-pipelines-e-modelos)
 7. [Análise causal da degradação](#análise-causal-da-degradação)
 8. [Etapa 4 — Governança e LGPD](#etapa-4--governança-e-lgpd)
-9. [Lições aprendidas](#lições-aprendidas)
-10. [Estrutura do repositório](#estrutura-do-repositório)
-11. [Versionamento](#versionamento)
+9. [Achados técnicos (errata)](#achados-técnicos-errata)
+10. [Lições aprendidas](#lições-aprendidas)
+11. [Estrutura do repositório](#estrutura-do-repositório)
+12. [Versionamento](#versionamento)
 
 ---
 
@@ -51,7 +54,7 @@ pip install -r requirements.txt
 export CREDIT_PII_SALT="um-segredo-forte"
 
 python -m src.pipeline          # ingestão → treino → simulação → monitoramento → relatórios (~30 s)
-pytest -q                       # 17 testes: contratos, estatística de drift, regras de alerta, métricas
+pytest -q                       # 18 testes: contratos, estatística e precisão do drift, regras de alerta, métricas
 
 mlflow ui --backend-store-uri sqlite:///mlflow.db   # http://127.0.0.1:5000
 ```
@@ -202,7 +205,7 @@ Duas camadas complementares, comparando cada lote de produção com a referênci
 | 2025-11 | **0,700** | 0,194 | — | age, pay_amt1–6, bill_amt1–6 | 15 |
 | 2025-12 | **0,683** | **0,364** | **pay_amt1–6, age** | limit_bal, bill_amt1–6 | 16 |
 
-\* falso positivo do KS: com milhares de linhas o teste detecta diferenças minúsculas. Por isso os alertas usam PSI (magnitude) e o KS/Evidently funciona como sinal antecipado.
+\* falso positivo do KS. Com milhares de linhas, o teste acusa diferenças minúsculas — medido em [Achados técnicos](#achados-técnicos-errata): 36,5% dos lotes **sem drift** têm ao menos um alarme de KS, contra 0% do PSI. Por isso os alertas usam PSI (magnitude) e o KS/Evidently funciona como sinal antecipado.
 
 **Variáveis degradadas apontadas:** `pay_amt1..6` e `age` (críticas), `limit_bal` e `bill_amt1..6` (moderadas) — exatamente as que foram alteradas. As features de status de pagamento (`pay_0..6`), que não foram mexidas, ficaram estáveis: **zero falsos positivos de PSI.**
 
@@ -349,7 +352,7 @@ Informação negativa de crédito respeita o limite de 5 anos do CDC (art. 43, �
 * **Exclusão de atributos protegidos** (sexo, estado civil) das features.
 * **Auditoria contínua:** disparate impact (aprovação do grupo menos favorecido ÷ mais favorecido, regra dos 4/5) por lote. Resultado: **0,91–0,98 em todos os meses** (acima de 0,80), sem alerta.
 * **Riscos remanescentes documentados:**
-  * *Proxies:* `age` e `education` podem carregar viés indireto. `age` sofreu drift (novo público jovem) — monitorar aprovação por faixa etária e testar o modelo sem `age` no próximo ciclo.
+  * *Proxies — risco medido:* no holdout, clientes com **50+ anos têm aprovação de 57,5% contra 75,2% na faixa 30–39 (razão 0,76, abaixo de 0,80)**. Parte da diferença acompanha um default real maior (24,7% contra 21,0%), mas `age` é feature e pode atuar como proxy. `age` também sofreu drift (novo público jovem). Ações registradas no [Model Card](docs/MODEL_CARD.md) § 6: monitorar disparate impact por faixa etária, treinar uma variante sem `age` e comparar no MLflow.
   * *Viés histórico do rótulo:* inadimplência passada reflete políticas de crédito passadas (só observamos default de quem foi aprovado — *reject inference*).
   * *Viés de população:* dataset de Taiwan/2005; antes de uso real seria necessário revalidar com a população brasileira.
 * **Segurança (art. 46) e incidentes (art. 48):** segredo de pseudonimização em secret manager, acesso mínimo ao audit store, comunicação à ANPD e aos titulares em caso de incidente relevante.
@@ -357,10 +360,70 @@ Informação negativa de crédito respeita o limite de 5 anos do CDC (art. 43, �
 
 ---
 
+## Achados técnicos (errata)
+
+Problemas e surpresas encontrados durante o desenvolvimento, com evidência reproduzível:
+
+```bash
+python -m src.technical_findings     # gera reports/technical_findings.json (~1 min)
+```
+
+### A1 — O PSI do Evidently não usa quantis, ao contrário do que diz a documentação
+
+A docstring de `get_binned_data` (Evidently 0.7.23) fala em *"buckets based on reference quantiles"*, mas para variáveis numéricas o código usa `np.histogram_bin_edges(..., bins="sturges")`, ou seja, **bins de largura igual sobre o range combinado** de referência + produção. Em variáveis financeiras de cauda longa, quase toda a massa cai no primeiro bin: **98,7% dos valores de `pay_amt1` ficam no 1º de 16 bins**. Resultado: o PSI do Evidently não é só "menos sensível", ele é **inconsistente**:
+
+| Mês | Feature | PSI por quantis (SENTRIX) | PSI Evidently | Leitura |
+|---|---|---|---|---|
+| 2025-12 | `pay_amt1` (pagamentos −50%) | **0,472** | 0,032 | Evidently **não vê** o drift mais forte do cenário |
+| 2025-12 | `bill_amt1` (faturas ×2) | 0,165 | **0,338** | Evidently **superestima**: o range combinado estica e redistribui a cauda |
+| 2025-12 | `limit_bal` | 0,184 | 0,138 | próximos |
+| 2025-11 | `pay_amt1` | 0,153 | 0,013 | idem |
+
+**Decisão:** os alertas usam o PSI próprio (bins por quantis da referência, padrão de mercado em risco de crédito). No relatório Evidently usamos **KS** para as numéricas e PSI só para as categóricas, onde o binning é por categoria e está correto.
+
+### A2 — KS em amostras grandes gera falso positivo; PSI não
+
+Experimento sob a hipótese nula: 200 sorteios de 2.495 linhas da própria referência contra o restante dela (não existe drift nenhum), testando as 14 features numéricas:
+
+| Teste | Falso positivo por feature | Lotes sem drift com ≥ 1 alarme |
+|---|---|---|
+| KS (p < 0,05) | 5,4% (≈ α nominal) | **36,5%** |
+| PSI (≥ 0,10) | 0,0% | **0,0%** |
+
+O KS se comporta como prometido (≈ 5% por teste), mas com 14 testes por lote o alarme falso vira rotina (efeito de comparações múltiplas). No pipeline real isso apareceu duas vezes: `bill_amt4` em 2025-08 (nosso KS) e uma coluna em 2025-07 (KS do Evidently), ambos meses sem drift.
+
+### A3 — Trade-off medido: KS detecta antes, PSI não erra
+
+Comparando com o gabarito da simulação (`data/production/drift_manifest.json`):
+
+| Mês | Features alteradas | PSI ≥ 0,10: precisão / recall | KS p < 0,05: precisão / recall |
+|---|---|---|---|
+| 2025-08 | 0 | — (nenhum alarme) | 1 falso positivo |
+| 2025-09 | 14 | 100% / 7% | 100% / 100% |
+| 2025-10 | 14 | — / 0% | 100% / 100% |
+| 2025-11 | 14 | 100% / 93% | 100% / 100% |
+| 2025-12 | 14 | 100% / 100% | 100% / 100% |
+
+O KS percebe o choque **dois meses antes**, mas ao preço do ruído medido em A2. O PSI só alarma quando a mudança já é material. **Recomendação para a v2:** KS como sinal *informativo* (dashboard, sem página ao plantão), com correção de Bonferroni/Benjamini-Hochberg, e PSI como gatilho de alerta.
+
+### A4 — Monitorar só X chega tarde
+
+Primeiro mês de cada alerta (`reports/technical_findings.json › F4`): `concept_drift_performance` CRITICAL em **2025-11**, um mês antes de `feature_drift_psi` CRITICAL e `dataset_drift` (2025-12). A queda de AUC com labels atrasados foi o sinal mais precoce entre os críticos.
+
+### A5 — pandas 3 quebra Evidently 0.7 e o parser ARFF do scikit-learn
+
+Com `pandas>=3`, `import evidently` falha (`ImportError: cannot import name 'infer_dtype_from_object'`) e `fetch_openml` quebra ao renomear categorias. Fixamos `pandas==2.3.3` e todas as dependências em versões exatas (`requirements.txt`).
+
+### A6 — Conflito de portas com a stack da Fase 3
+
+Prometheus e Grafana da Fase 3 já ocupavam 9090/3000. A stack SENTRIX usa 9190/3100 por padrão (configuráveis), para as duas rodarem lado a lado.
+
+---
+
 ## Lições aprendidas
 
 1. **Drift de entrada não basta.** O alerta mais valioso (AUC −0,08 em 2025-11) veio da performance com labels, um mês antes de o PSI ficar crítico.
-2. **KS em amostras grandes é sensível demais** (falso positivo no mês sem drift). PSI dá a magnitude; KS/Evidently servem de sinal precoce.
+2. **Toda métrica de drift tem um viés de implementação.** O PSI do Evidently usa bins de largura igual e não enxerga `pay_amt1` caindo pela metade (A1). O KS dispara em 36,5% dos lotes sem drift (A2). Validar o detector contra um gabarito é tão importante quanto validar o modelo.
 3. **Contrato de dados é a primeira linha de defesa**, inclusive de privacidade: o schema estrito impede que PII chegue ao modelo.
 4. **Causalidade muda a resposta.** Data drift pede recalibração; concept drift pede retreino com dados novos. Saber qual domina evita a correção errada.
 5. **Observabilidade precisa de um formato comum.** Logs JSON + MLflow + Prometheus a partir dos mesmos registros deixam qualquer ferramenta (Grafana, Datadog) consumir sem retrabalho.
@@ -384,6 +447,7 @@ Informação negativa de crédito respeita o limite de 5 anos do CDC (art. 43, �
 │   ├── dashboard.py         # dashboard HTML (Plotly)
 │   ├── logging_utils.py     # logs JSON estruturados
 │   ├── push_metrics.py      # reenvia o último run ao Pushgateway
+│   ├── technical_findings.py # evidências da seção Achados técnicos
 │   └── pipeline.py          # orquestração ponta a ponta
 ├── tests/                   # pytest
 ├── reports/                 # dashboard, Evidently, drift tables, alertas, métricas
@@ -393,7 +457,7 @@ Informação negativa de crédito respeita o limite de 5 anos do CDC (art. 43, �
 │   ├── prometheus/          # prometheus.yml, alerts.yml (11 regras), alerts_test.yml (promtool)
 │   └── grafana/             # provisioning, dashboards/sentrix.json, generate_dashboard.py
 ├── docker-compose.yml       # Pushgateway + Prometheus + Grafana
-├── docs/                    # capa
+├── docs/                    # MODEL_CARD.md, SPEC.md, capa
 ├── CHANGELOG.md
 └── .github/workflows/ci.yml
 ```
@@ -402,7 +466,7 @@ Informação negativa de crédito respeita o limite de 5 anos do CDC (art. 43, �
 
 | O quê | Versão | Onde |
 |---|---|---|
-| Projeto SENTRIX | **1.1.0** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0`, `v1.1.0` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
+| Projeto SENTRIX | **1.2.0** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0`, `v1.1.0`, `v1.2.0` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
 | Modelo `credit-scoring-xgb` | 1.0.0 | `models/model_metadata.json` + MLflow (com hash SHA-256 dos dados de treino) |
 | Contrato de dados | `credit_scoring_input_contract_v1` | `src/contracts.py` |
 | Python | 3.11 | CI e ambiente local |
