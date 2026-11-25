@@ -6,6 +6,14 @@ Versões independentes:
 - **Projeto SENTRIX** — tags git `vX.Y.Z` e `src/__init__.py::__version__`.
 - **Modelo** `credit-scoring-xgb` — `models/model_metadata.json::version` (muda só quando o modelo é retreinado).
 
+## [1.4.0] — 2026-11-25
+
+### Adicionado
+- Portal do projeto no **GitHub Pages** (`src/portal.py`, alvos `make site` e `make serve`): KPIs, gráfico de AUC por mês, linha do tempo dos lotes com links para os relatórios Evidently, achados técnicos e links para o dashboard, o Model Card e a SPEC. Publicado em https://vdfs89.github.io/sentrix-ml/.
+- **CD**: job `deploy-pages`, que publica o portal a cada build da `main`; workflow `release.yml`, que cria uma GitHub Release em cada tag `vX.Y.Z` com as notas do CHANGELOG e as evidências em `.zip`.
+- Execução **mensal agendada** (cron) e manual (`workflow_dispatch`) do pipeline.
+- Testes do portal (agora são 20 no total).
+
 ## [1.3.0] — 2026-11-25
 
 ### Adicionado
@@ -66,6 +74,7 @@ Versões independentes:
 - README com governança e LGPD e CI no GitHub Actions.
 - Identidade SENTRIX e capa.
 
+[1.4.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/vdfs89/sentrix-ml/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.1.0...v1.2.0
