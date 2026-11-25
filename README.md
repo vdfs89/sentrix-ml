@@ -418,6 +418,10 @@ Com `pandas>=3`, `import evidently` falha (`ImportError: cannot import name 'inf
 
 Prometheus e Grafana da Fase 3 já ocupavam 9090/3000. A stack SENTRIX usa 9190/3100 por padrão (configuráveis), para as duas rodarem lado a lado.
 
+### A7 — Pushgateway perde tudo quando o Docker reinicia
+
+Uma atualização do Docker Desktop reiniciou o engine e o Pushgateway voltou com **0 métricas**: por padrão ele guarda tudo em memória, então o painel ficaria vazio até a próxima execução do pipeline. A correção foi `--persistence.file` em um volume. Na primeira tentativa, o volume montado em `/data` deu `permission denied`, porque o processo roda como `nobody` e o volume pertencia ao root. A versão final monta em `/pushgateway`, diretório que já é do `nobody` na imagem. Validado: 196 métricas presentes depois de `docker compose restart pushgateway`.
+
 ---
 
 ## Lições aprendidas
@@ -466,7 +470,7 @@ Prometheus e Grafana da Fase 3 já ocupavam 9090/3000. A stack SENTRIX usa 9190/
 
 | O quê | Versão | Onde |
 |---|---|---|
-| Projeto SENTRIX | **1.2.0** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0`, `v1.1.0`, `v1.2.0` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
+| Projeto SENTRIX | **1.2.1** ([SemVer](https://semver.org/lang/pt-BR/)) | tags git `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1` · `src/__init__.py` · [`CHANGELOG.md`](CHANGELOG.md) |
 | Modelo `credit-scoring-xgb` | 1.0.0 | `models/model_metadata.json` + MLflow (com hash SHA-256 dos dados de treino) |
 | Contrato de dados | `credit_scoring_input_contract_v1` | `src/contracts.py` |
 | Python | 3.11 | CI e ambiente local |
