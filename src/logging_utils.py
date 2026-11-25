@@ -4,6 +4,7 @@ Each record carries run_id, stage, status, duration_ms and arbitrary context fie
 log file can be loaded as a table by the dashboard, shipped to Datadog/Loki/CloudWatch, or
 grepped by an operator.
 """
+
 from __future__ import annotations
 
 import json
@@ -11,19 +12,20 @@ import logging
 import sys
 import time
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Any, Iterator
+from datetime import UTC, datetime
+from typing import Any
 
 from . import config
 
-RUN_ID = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:6]
+RUN_ID = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:6]
 
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
-            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "run_id": RUN_ID,
@@ -75,8 +77,17 @@ def stage(logger: logging.Logger, name: str, **ctx: Any) -> Iterator[dict[str, A
         yield info
     except Exception as exc:  # noqa: BLE001 - re-raised after logging
         duration = round((time.perf_counter() - start) * 1000, 2)
-        log_event(logger, logging.ERROR, f"stage failed: {exc}", stage=name, status="failed",
-                  duration_ms=duration, error_type=type(exc).__name__, **ctx, **info)
+        log_event(
+            logger,
+            logging.ERROR,
+            f"stage failed: {exc}",
+            stage=name,
+            status="failed",
+            duration_ms=duration,
+            error_type=type(exc).__name__,
+            **ctx,
+            **info,
+        )
         raise
     duration = round((time.perf_counter() - start) * 1000, 2)
     info["duration_ms"] = duration

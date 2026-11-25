@@ -1,4 +1,5 @@
 """Validation gate: applies the data contract to a batch and blocks ingestion on failure."""
+
 from __future__ import annotations
 
 import json
@@ -56,7 +57,9 @@ def _rule_for(column: str | None, check: str) -> str:
     return "R10"
 
 
-def validate_batch(df: pd.DataFrame, batch: str, quarantine: bool = True) -> tuple[ValidationResult, pd.DataFrame | None]:
+def validate_batch(
+    df: pd.DataFrame, batch: str, quarantine: bool = True
+) -> tuple[ValidationResult, pd.DataFrame | None]:
     """Return (result, validated_df). validated_df is None when the batch is blocked."""
     with stage(logger, "data_validation", batch=batch, rows=len(df)) as info:
         try:
@@ -66,17 +69,23 @@ def validate_batch(df: pd.DataFrame, batch: str, quarantine: bool = True) -> tup
             return result, validated
         except pandera.errors.SchemaErrors as err:
             fc = err.failure_cases.copy()
-            fc["rule"] = [_rule_for(c, k) for c, k in zip(fc["column"], fc["check"])]
+            fc["rule"] = [_rule_for(c, k) for c, k in zip(fc["column"], fc["check"], strict=True)]
             failed_rules = fc["rule"].value_counts().sort_index().to_dict()
             failed_rows = int(fc["index"].dropna().nunique())
             sample = (
-                fc.groupby("rule").head(3)[["rule", "column", "check", "failure_case", "index"]]
-                .astype(str).to_dict(orient="records")
+                fc.groupby("rule")
+                .head(3)[["rule", "column", "check", "failure_case", "index"]]
+                .astype(str)
+                .to_dict(orient="records")
             )
             result = ValidationResult(
-                batch=batch, passed=False, rows=len(df), n_failures=len(fc),
+                batch=batch,
+                passed=False,
+                rows=len(df),
+                n_failures=len(fc),
                 failed_rules={k: int(v) for k, v in failed_rules.items()},
-                failed_rows=failed_rows, sample_failures=sample,
+                failed_rows=failed_rows,
+                sample_failures=sample,
             )
             if quarantine:
                 config.QUARANTINE_DIR.mkdir(parents=True, exist_ok=True)
@@ -84,13 +93,18 @@ def validate_batch(df: pd.DataFrame, batch: str, quarantine: bool = True) -> tup
                 fc.to_csv(config.QUARANTINE_DIR / f"{batch}_failure_cases.csv", index=False)
                 report = {**result.to_dict(), "rules": {k: RULES[k] for k in failed_rules}}
                 (config.QUARANTINE_DIR / f"{batch}_validation_report.json").write_text(
-                    json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-            info.update(passed=False, n_failures=len(fc), failed_rules=result.failed_rules,
-                        status="blocked")
-            log_event(logger, logging.CRITICAL,
-                      "DATA CONTRACT VIOLATED - batch blocked and quarantined",
-                      stage="data_validation", batch=batch, failed_rules=result.failed_rules,
-                      alert="ingestion_blocked")
+                    json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
+            info.update(passed=False, n_failures=len(fc), failed_rules=result.failed_rules, status="blocked")
+            log_event(
+                logger,
+                logging.CRITICAL,
+                "DATA CONTRACT VIOLATED - batch blocked and quarantined",
+                stage="data_validation",
+                batch=batch,
+                failed_rules=result.failed_rules,
+                alert="ingestion_blocked",
+            )
             return result, None
 
 
@@ -104,14 +118,14 @@ def make_corrupted_batch(clean: pd.DataFrame, seed: int = config.RANDOM_SEED) ->
         return rng.choice(n, size=k, replace=False)
 
     bad = bad.astype({"limit_bal": float, "age": float, "pay_amt1": float})
-    bad.loc[pick(25), "limit_bal"] = np.nan            # R1 null income/limit
-    bad.loc[pick(12), "age"] = 15                       # R2 minor
-    bad.loc[pick(6), "age"] = 150                       # R2 impossible age
-    bad.loc[pick(8), "limit_bal"] = -5_000              # R3 negative limit
-    bad.loc[pick(10), "education"] = 9                  # R4 unknown code
-    bad.loc[pick(5), "pay_0"] = 12                      # R5 invalid status
-    bad.loc[pick(7), "pay_amt1"] = -300                 # R6 negative payment
-    dupes = bad.sample(15, random_state=seed)           # R7 duplicated customers
+    bad.loc[pick(25), "limit_bal"] = np.nan  # R1 null income/limit
+    bad.loc[pick(12), "age"] = 15  # R2 minor
+    bad.loc[pick(6), "age"] = 150  # R2 impossible age
+    bad.loc[pick(8), "limit_bal"] = -5_000  # R3 negative limit
+    bad.loc[pick(10), "education"] = 9  # R4 unknown code
+    bad.loc[pick(5), "pay_0"] = 12  # R5 invalid status
+    bad.loc[pick(7), "pay_amt1"] = -300  # R6 negative payment
+    dupes = bad.sample(15, random_state=seed)  # R7 duplicated customers
     bad = pd.concat([bad, dupes], ignore_index=True)
-    bad["cpf"] = "00000000000"                          # R9 raw PII leaked by upstream
+    bad["cpf"] = "00000000000"  # R9 raw PII leaked by upstream
     return bad

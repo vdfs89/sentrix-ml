@@ -7,6 +7,7 @@
 * Evidently AI report (HTML) with per-column drift tests, target/prediction drift and, when
   labels are available, classification quality vs. reference (concept drift evidence).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -56,22 +57,28 @@ def feature_drift_table(reference: pd.DataFrame, current: pd.DataFrame) -> pd.Da
         is_cat = col in config.CATEGORICAL_FEATURES
         p = psi(reference[col], current[col], categorical=is_cat)
         d, pval = ks(reference[col], current[col]) if not is_cat else (np.nan, np.nan)
-        rows.append({
-            "feature": col, "type": "categorical" if is_cat else "numerical",
-            "psi": round(p, 4), "ks_statistic": None if is_cat else round(d, 4),
-            "ks_pvalue": None if is_cat else float(f"{pval:.3g}"),
-            "ks_drift": (not is_cat) and pval < config.KS_PVALUE,
-            "severity": severity(p),
-            "ref_mean": round(float(reference[col].mean()), 2),
-            "cur_mean": round(float(current[col].mean()), 2),
-        })
+        rows.append(
+            {
+                "feature": col,
+                "type": "categorical" if is_cat else "numerical",
+                "psi": round(p, 4),
+                "ks_statistic": None if is_cat else round(d, 4),
+                "ks_pvalue": None if is_cat else float(f"{pval:.3g}"),
+                "ks_drift": (not is_cat) and pval < config.KS_PVALUE,
+                "severity": severity(p),
+                "ref_mean": round(float(reference[col].mean()), 2),
+                "cur_mean": round(float(current[col].mean()), 2),
+            }
+        )
     return pd.DataFrame(rows).sort_values("psi", ascending=False).reset_index(drop=True)
 
 
 # --- Evidently ----------------------------------------------------------------------------------
 
-def evidently_report(reference: pd.DataFrame, current: pd.DataFrame, out_html: Path,
-                     with_labels: bool = True) -> dict[str, float]:
+
+def evidently_report(
+    reference: pd.DataFrame, current: pd.DataFrame, out_html: Path, with_labels: bool = True
+) -> dict[str, float]:
     """Generate the Evidently HTML report and return the key values it computed."""
     from evidently import BinaryClassification, DataDefinition, Dataset, Report
     from evidently.presets import ClassificationPreset, DataDriftPreset
@@ -81,15 +88,25 @@ def evidently_report(reference: pd.DataFrame, current: pd.DataFrame, out_html: P
         cols.append(config.TARGET)
     definition = DataDefinition(
         numerical_columns=[*config.NUMERICAL_FEATURES, "prediction"],
-        categorical_columns=[*config.CATEGORICAL_FEATURES, "prediction_label",
-                             *([config.TARGET] if with_labels else [])],
-        classification=[BinaryClassification(
-            target=config.TARGET, prediction_labels="prediction_label",
-            prediction_probas="prediction")] if with_labels else None,
+        categorical_columns=[
+            *config.CATEGORICAL_FEATURES,
+            "prediction_label",
+            *([config.TARGET] if with_labels else []),
+        ],
+        classification=[
+            BinaryClassification(
+                target=config.TARGET, prediction_labels="prediction_label", prediction_probas="prediction"
+            )
+        ]
+        if with_labels
+        else None,
     )
     drift_cols = [*config.FEATURES, "prediction", *([config.TARGET] if with_labels else [])]
-    metrics = [DataDriftPreset(columns=drift_cols, num_method="ks", cat_method="psi",
-                               drift_share=config.DRIFT_SHARE_CRITICAL)]
+    metrics = [
+        DataDriftPreset(
+            columns=drift_cols, num_method="ks", cat_method="psi", drift_share=config.DRIFT_SHARE_CRITICAL
+        )
+    ]
     if with_labels:
         metrics.append(ClassificationPreset())
     report = Report(metrics, include_tests=True)
@@ -110,7 +127,8 @@ def evidently_report(reference: pd.DataFrame, current: pd.DataFrame, out_html: P
         elif mtype == "DriftedColumnsCount" and isinstance(val, dict):
             values["evidently_drifted_columns"] = float(val.get("count", 0))
             values["evidently_drifted_share"] = float(val.get("share", 0))
-        elif mtype in {"RocAuc", "Accuracy", "F1Score", "Precision", "Recall"} and \
-                isinstance(val, (int, float)):
+        elif mtype in {"RocAuc", "Accuracy", "F1Score", "Precision", "Recall"} and isinstance(
+            val, (int, float)
+        ):
             values[f"evidently_{mtype.lower()}"] = float(val)
     return values

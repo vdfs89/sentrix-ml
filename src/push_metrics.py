@@ -1,7 +1,8 @@
 """Push the metrics of the last pipeline run to the Pushgateway without re-running it.
 
-    SENTRIX_PUSHGATEWAY=http://localhost:9091 python -m src.push_metrics
+SENTRIX_PUSHGATEWAY=http://localhost:9091 python -m src.push_metrics
 """
+
 from __future__ import annotations
 
 import json

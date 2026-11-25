@@ -8,14 +8,16 @@ from src.validation import make_corrupted_batch, validate_batch
 
 def _clean_batch(n: int = 300) -> pd.DataFrame:
     rng = np.random.default_rng(0)
-    df = pd.DataFrame({
-        config.ID_COL: [f"key{i:08d}" for i in range(n)],
-        config.TIME_COL: "2025-07",
-        "limit_bal": rng.integers(1, 50, n) * 10_000.0,
-        "education": rng.integers(1, 5, n),
-        "age": rng.integers(21, 70, n),
-        config.TARGET: rng.integers(0, 2, n),
-    })
+    df = pd.DataFrame(
+        {
+            config.ID_COL: [f"key{i:08d}" for i in range(n)],
+            config.TIME_COL: "2025-07",
+            "limit_bal": rng.integers(1, 50, n) * 10_000.0,
+            "education": rng.integers(1, 5, n),
+            "age": rng.integers(21, 70, n),
+            config.TARGET: rng.integers(0, 2, n),
+        }
+    )
     for c in config.PAY_STATUS:
         df[c] = rng.integers(-2, 3, n)
     for c in config.BILL_AMT:
@@ -38,10 +40,16 @@ def test_corrupted_batch_is_blocked_with_every_rule_family():
         assert rule in result.failed_rules, rule
 
 
-@pytest.mark.parametrize("column,value,rule", [
-    ("age", 17, "R2"), ("limit_bal", 0, "R3"), ("education", 7, "R4"),
-    ("pay_0", 9, "R5"), ("pay_amt3", -1, "R6"),
-])
+@pytest.mark.parametrize(
+    "column,value,rule",
+    [
+        ("age", 17, "R2"),
+        ("limit_bal", 0, "R3"),
+        ("education", 7, "R4"),
+        ("pay_0", 9, "R5"),
+        ("pay_amt3", -1, "R6"),
+    ],
+)
 def test_single_rule_violation(column, value, rule):
     df = _clean_batch()
     df.loc[0, column] = value

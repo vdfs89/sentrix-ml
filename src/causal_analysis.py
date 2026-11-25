@@ -17,6 +17,7 @@ Effects reported per month:
 * auc_drop_data_drift: AUC(original X, original y) - AUC(drifted X, original y)
 * auc_drop_concept_drift: AUC(drifted X, original y) - AUC(drifted X, drifted y)
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -61,18 +62,20 @@ def analyse_month(model, threshold: float, month: str) -> dict:
     auc_oo = roc_auc_score(y_orig, p_orig)
     auc_do = roc_auc_score(y_orig, p_drift)
     auc_dd = roc_auc_score(y_drift, p_drift)
-    res.update({
-        "auc_original": float(auc_oo),
-        "auc_drifted_x_original_y": float(auc_do),
-        "auc_observed": float(auc_dd),
-        "auc_drop_data_drift": float(auc_oo - auc_do),
-        "auc_drop_concept_drift": float(auc_do - auc_dd),
-        "default_rate_original": float(y_orig.mean()),
-        "default_rate_observed": float(y_drift.mean()),
-        # Defaults the model approved (missed risk) — the business cost of silent degradation
-        "missed_defaults_original": int(((p_orig < threshold) & (y_orig == 1)).sum()),
-        "missed_defaults_observed": int(((p_drift < threshold) & (y_drift == 1)).sum()),
-    })
+    res.update(
+        {
+            "auc_original": float(auc_oo),
+            "auc_drifted_x_original_y": float(auc_do),
+            "auc_observed": float(auc_dd),
+            "auc_drop_data_drift": float(auc_oo - auc_do),
+            "auc_drop_concept_drift": float(auc_do - auc_dd),
+            "default_rate_original": float(y_orig.mean()),
+            "default_rate_observed": float(y_drift.mean()),
+            # Defaults the model approved (missed risk) — the business cost of silent degradation
+            "missed_defaults_original": int(((p_orig < threshold) & (y_orig == 1)).sum()),
+            "missed_defaults_observed": int(((p_drift < threshold) & (y_drift == 1)).sum()),
+        }
+    )
     return res
 
 
@@ -80,7 +83,9 @@ def run_causal_analysis(model, threshold: float) -> list[dict]:
     with stage(logger, "causal_analysis") as info:
         out = [analyse_month(model, threshold, s["month"]) for s in config.DRIFT_SCHEDULE]
         last = out[-1]
-        info.update(month=last["month"],
-                    auc_drop_data=round(last["auc_drop_data_drift"], 4),
-                    auc_drop_concept=round(last["auc_drop_concept_drift"], 4))
+        info.update(
+            month=last["month"],
+            auc_drop_data=round(last["auc_drop_data_drift"], 4),
+            auc_drop_concept=round(last["auc_drop_concept_drift"], 4),
+        )
     return out

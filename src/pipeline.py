@@ -12,6 +12,7 @@ For every production month:
   6. Alert rules -> structured logs, MLflow, Prometheus textfile
 Then: causal analysis + consolidated monitoring dashboard.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -36,14 +37,29 @@ from .validation import make_corrupted_batch, validate_batch
 logger = get_logger()
 
 
-def monitor_batch(name: str, df: pd.DataFrame, model, meta: dict, reference: pd.DataFrame,
-                  holdout: pd.DataFrame, protected: pd.DataFrame, step: int) -> dict:
-    record: dict = {"batch": name, "step": step, "rows": len(df),
-                    "kind": "corrupted" if "upstream" in name else "production"}
+def monitor_batch(
+    name: str,
+    df: pd.DataFrame,
+    model,
+    meta: dict,
+    reference: pd.DataFrame,
+    holdout: pd.DataFrame,
+    protected: pd.DataFrame,
+    step: int,
+) -> dict:
+    record: dict = {
+        "batch": name,
+        "step": step,
+        "rows": len(df),
+        "kind": "corrupted" if "upstream" in name else "production",
+    }
 
     result, valid = validate_batch(df, batch=name)
-    record.update(validation_passed=result.passed, failed_rules=result.failed_rules,
-                  validation_failures=result.n_failures)
+    record.update(
+        validation_passed=result.passed,
+        failed_rules=result.failed_rules,
+        validation_failures=result.n_failures,
+    )
     if valid is None:
         return record
 
@@ -52,45 +68,63 @@ def monitor_batch(name: str, df: pd.DataFrame, model, meta: dict, reference: pd.
         scored = score(model, valid, meta["threshold"])
         latency = (time.perf_counter() - t0) * 1000
         info.update(latency_ms=round(latency, 2))
-    record.update(inference_latency_ms=round(latency, 2),
-                  latency_ms_per_1k_rows=round(latency / len(valid) * 1000, 3),
-                  mean_pd=float(scored["prediction"].mean()),
-                  approval_rate=float((scored["prediction_label"] == 0).mean()))
+    record.update(
+        inference_latency_ms=round(latency, 2),
+        latency_ms_per_1k_rows=round(latency / len(valid) * 1000, 3),
+        mean_pd=float(scored["prediction"].mean()),
+        approval_rate=float((scored["prediction_label"] == 0).mean()),
+    )
 
     with stage(logger, "drift_detection", batch=name) as info:
         table = feature_drift_table(reference, scored)
         table.to_csv(config.REPORTS_DIR / "drift_tables" / f"drift_{name}.csv", index=False)
-        record["psi"] = dict(zip(table["feature"], table["psi"]))
+        record["psi"] = dict(zip(table["feature"], table["psi"], strict=True))
         record["ks_pvalue"] = {r.feature: r.ks_pvalue for r in table.itertuples() if r.ks_pvalue is not None}
-        record["ks_statistic"] = {r.feature: r.ks_statistic for r in table.itertuples() if r.ks_statistic is not None}
+        record["ks_statistic"] = {
+            r.feature: r.ks_statistic for r in table.itertuples() if r.ks_statistic is not None
+        }
         critical = table.loc[table["severity"] == "critical", "feature"].tolist()
         warning = table.loc[table["severity"] == "warning", "feature"].tolist()
-        record.update(drifted_features=critical, warning_features=warning,
-                      n_drifted_features=len(critical),
-                      drift_share=len(critical) / len(config.FEATURES),
-                      prediction_psi=psi(reference["prediction"], scored["prediction"]),
-                      target_psi=psi(reference[config.TARGET], scored[config.TARGET], categorical=True))
+        record.update(
+            drifted_features=critical,
+            warning_features=warning,
+            n_drifted_features=len(critical),
+            drift_share=len(critical) / len(config.FEATURES),
+            prediction_psi=psi(reference["prediction"], scored["prediction"]),
+            target_psi=psi(reference[config.TARGET], scored[config.TARGET], categorical=True),
+        )
         html = config.EVIDENTLY_DIR / f"drift_report_{name}.html"
         record.update(evidently_report(holdout, scored, html, with_labels=True))
         record["evidently_report"] = html.relative_to(config.ROOT).as_posix()
-        info.update(n_drifted=len(critical), drift_share=round(record["drift_share"], 3),
-                    prediction_psi=round(record["prediction_psi"], 4))
+        info.update(
+            n_drifted=len(critical),
+            drift_share=round(record["drift_share"], 3),
+            prediction_psi=round(record["prediction_psi"], 4),
+        )
 
-    perf = classification_metrics(scored[config.TARGET].to_numpy(), scored["prediction"].to_numpy(),
-                                  meta["threshold"])
+    perf = classification_metrics(
+        scored[config.TARGET].to_numpy(), scored["prediction"].to_numpy(), meta["threshold"]
+    )
     record.update({k: perf[k] for k in ("auc", "f1", "recall", "precision", "observed_default_rate")})
     fair = disparate_impact(scored, protected)
-    record.update(disparate_impact=fair["disparate_impact"],
-                  approval_by_sex=fair["approval_rate_by_group"])
+    record.update(disparate_impact=fair["disparate_impact"], approval_by_sex=fair["approval_rate_by_group"])
     return record
 
 
 def log_to_mlflow(record: dict, alerts: list[dict]) -> None:
     with mlflow.start_run(run_name=f"batch-{record['batch']}", nested=True):
-        mlflow.set_tags({"batch": record["batch"], "kind": record["kind"],
-                         "validation_passed": str(record["validation_passed"])})
-        scalars = {k: float(v) for k, v in record.items()
-                   if isinstance(v, (int, float)) and not isinstance(v, bool) and k != "step"}
+        mlflow.set_tags(
+            {
+                "batch": record["batch"],
+                "kind": record["kind"],
+                "validation_passed": str(record["validation_passed"]),
+            }
+        )
+        scalars = {
+            k: float(v)
+            for k, v in record.items()
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and k != "step"
+        }
         scalars["validation_passed"] = float(record["validation_passed"])
         scalars["alerts_critical"] = float(sum(a["severity"] == "CRITICAL" for a in alerts))
         scalars["alerts_warning"] = float(sum(a["severity"] == "WARNING" for a in alerts))
@@ -104,8 +138,7 @@ def log_to_mlflow(record: dict, alerts: list[dict]) -> None:
     for key in ("drift_share", "auc", "prediction_psi", "approval_rate", "rows"):
         if key in record:
             mlflow.log_metric(f"timeline_{key}", float(record[key]), step=record["step"])
-    mlflow.log_metric("timeline_validation_passed", float(record["validation_passed"]),
-                      step=record["step"])
+    mlflow.log_metric("timeline_validation_passed", float(record["validation_passed"]), step=record["step"])
 
 
 def run_monitoring() -> dict:
@@ -140,9 +173,11 @@ def run_monitoring() -> dict:
                 log_to_mlflow(record, alerts)
                 records.append(record)
                 all_alerts.extend(alerts)
-                info.update(validation_passed=record["validation_passed"],
-                            alerts_critical=record["n_alerts_critical"],
-                            status="success" if record["validation_passed"] else "blocked")
+                info.update(
+                    validation_passed=record["validation_passed"],
+                    alerts_critical=record["n_alerts_critical"],
+                    status="success" if record["validation_passed"] else "blocked",
+                )
 
         causal = run_causal_analysis(model, meta["threshold"])
         save_json(records, "monitoring_records.json")
@@ -155,8 +190,16 @@ def run_monitoring() -> dict:
             mlflow.log_artifact(str(config.REPORTS_DIR / f), "reports")
         mlflow.log_artifact(str(path), "reports")
 
-    log_event(logger, logging.INFO, "pipeline finished", stage="pipeline", status="success",
-              batches=len(records), alerts=len(all_alerts), dashboard=str(path))
+    log_event(
+        logger,
+        logging.INFO,
+        "pipeline finished",
+        stage="pipeline",
+        status="success",
+        batches=len(records),
+        alerts=len(all_alerts),
+        dashboard=str(path),
+    )
     return {"records": records, "alerts": all_alerts, "causal": causal}
 
 

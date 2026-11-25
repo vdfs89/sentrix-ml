@@ -1,4 +1,5 @@
 """Central configuration: paths, feature lists, thresholds and drift schedule."""
+
 from __future__ import annotations
 
 import os
@@ -68,10 +69,10 @@ NUMERICAL_FEATURES = [c for c in FEATURES if c not in CATEGORICAL_FEATURES]
 PSI_WARNING = 0.10
 PSI_CRITICAL = 0.20
 KS_PVALUE = 0.05
-DRIFT_SHARE_CRITICAL = 0.30          # share of features with PSI >= PSI_CRITICAL
-AUC_DROP_CRITICAL = 0.05             # absolute AUC drop vs. reference holdout
-DEFAULT_RATE_SHIFT_WARNING = 0.05    # absolute shift in observed default rate (label drift)
-DISPARATE_IMPACT_MIN = 0.80          # four-fifths rule for fairness audit
+DRIFT_SHARE_CRITICAL = 0.30  # share of features with PSI >= PSI_CRITICAL
+AUC_DROP_CRITICAL = 0.05  # absolute AUC drop vs. reference holdout
+DEFAULT_RATE_SHIFT_WARNING = 0.05  # absolute shift in observed default rate (label drift)
+DISPARATE_IMPACT_MIN = 0.80  # four-fifths rule for fairness audit
 
 # --- Simulated economic scenario (one entry per production month) ---------------------------
 # inflation: bills grow, real payments shrink | new_profile_share: influx of young, low-limit clients
@@ -90,6 +91,15 @@ CORRUPTED_BATCH_SOURCE_MONTH = "2025-09"
 
 
 def ensure_dirs() -> None:
-    for d in (RAW_DIR, REFERENCE_DIR, PRODUCTION_DIR, QUARANTINE_DIR, AUDIT_DIR,
-              MODELS_DIR, REPORTS_DIR, EVIDENTLY_DIR, LOGS_DIR):
+    for d in (
+        RAW_DIR,
+        REFERENCE_DIR,
+        PRODUCTION_DIR,
+        QUARANTINE_DIR,
+        AUDIT_DIR,
+        MODELS_DIR,
+        REPORTS_DIR,
+        EVIDENTLY_DIR,
+        LOGS_DIR,
+    ):
         d.mkdir(parents=True, exist_ok=True)

@@ -11,6 +11,7 @@ Steps
    features, only used to audit bias (LGPD art. 6 IX - non-discrimination).
 5. Split into Reference (training era) and Production pool (future months, where drift happens).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -26,8 +27,17 @@ from .logging_utils import get_logger, stage
 logger = get_logger()
 
 COLUMN_MAP = {
-    "x1": "limit_bal", "x2": "sex", "x3": "education", "x4": "marriage", "x5": "age",
-    "x6": "pay_0", "x7": "pay_2", "x8": "pay_3", "x9": "pay_4", "x10": "pay_5", "x11": "pay_6",
+    "x1": "limit_bal",
+    "x2": "sex",
+    "x3": "education",
+    "x4": "marriage",
+    "x5": "age",
+    "x6": "pay_0",
+    "x7": "pay_2",
+    "x8": "pay_3",
+    "x9": "pay_4",
+    "x10": "pay_5",
+    "x11": "pay_6",
     **{f"x{11 + i}": f"bill_amt{i}" for i in range(1, 7)},
     **{f"x{17 + i}": f"pay_amt{i}" for i in range(1, 7)},
     "y": config.TARGET,
@@ -55,9 +65,7 @@ def _salt() -> bytes:
 def pseudonymize(values: pd.Series) -> pd.Series:
     """Keyed hash (HMAC-SHA256). Irreversible without the secret salt; stable for joins."""
     key = _salt()
-    return values.astype(str).map(
-        lambda v: hmac.new(key, v.encode(), hashlib.sha256).hexdigest()[:20]
-    )
+    return values.astype(str).map(lambda v: hmac.new(key, v.encode(), hashlib.sha256).hexdigest()[:20])
 
 
 def _synthetic_cpf(rng: np.random.Generator, n: int) -> list[str]:
@@ -100,7 +108,7 @@ def run_ingestion() -> dict[str, int]:
         df = df.sample(frac=1.0, random_state=config.RANDOM_SEED).reset_index(drop=True)
 
         reference = df.iloc[: config.REFERENCE_SIZE].copy()
-        production = df.iloc[config.REFERENCE_SIZE:].copy()
+        production = df.iloc[config.REFERENCE_SIZE :].copy()
         reference[config.TIME_COL] = assign_months(len(reference), config.REFERENCE_START, 6)
         production[config.TIME_COL] = assign_months(
             len(production), config.PRODUCTION_START, config.N_PRODUCTION_BATCHES
@@ -114,8 +122,12 @@ def run_ingestion() -> dict[str, int]:
         reference[cols].to_csv(config.REFERENCE_FILE, index=False)
         production[cols].to_csv(config.PRODUCTION_POOL_FILE, index=False)
 
-        info.update(rows_raw=len(raw), duplicates_removed=n_dupes,
-                    rows_reference=len(reference), rows_production=len(production))
+        info.update(
+            rows_raw=len(raw),
+            duplicates_removed=n_dupes,
+            rows_reference=len(reference),
+            rows_production=len(production),
+        )
     return info
 
 

@@ -1,16 +1,16 @@
 """Baseline credit-risk model (XGBoost) trained ONLY on the Reference dataset."""
+
 from __future__ import annotations
 
 import hashlib
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import mlflow
 import numpy as np
 import pandas as pd
-from sklearn.metrics import (accuracy_score, f1_score, precision_score, recall_score,
-                             roc_auc_score)
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
@@ -22,8 +22,15 @@ from .validation import validate_batch
 logger = get_logger()
 
 PARAMS = dict(
-    n_estimators=300, max_depth=4, learning_rate=0.05, subsample=0.8, colsample_bytree=0.8,
-    min_child_weight=5, reg_lambda=1.0, eval_metric="auc", random_state=config.RANDOM_SEED,
+    n_estimators=300,
+    max_depth=4,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    min_child_weight=5,
+    reg_lambda=1.0,
+    eval_metric="auc",
+    random_state=config.RANDOM_SEED,
     n_jobs=-1,
 )
 
@@ -73,8 +80,8 @@ def run_training() -> dict:
 
     with stage(logger, "training", model="xgboost") as info:
         train_df, test_df = train_test_split(
-            reference, test_size=0.2, stratify=reference[config.TARGET],
-            random_state=config.RANDOM_SEED)
+            reference, test_size=0.2, stratify=reference[config.TARGET], random_state=config.RANDOM_SEED
+        )
         model = XGBClassifier(**PARAMS)
         t0 = time.perf_counter()
         model.fit(train_df[config.FEATURES], train_df[config.TARGET])
@@ -86,14 +93,19 @@ def run_training() -> dict:
 
         model.save_model(config.MODEL_FILE)
         data_hash = hashlib.sha256(
-            pd.util.hash_pandas_object(reference, index=False).values.tobytes()).hexdigest()
-        importances = dict(sorted(
-            zip(config.FEATURES, map(float, model.feature_importances_)),
-            key=lambda kv: kv[1], reverse=True))
+            pd.util.hash_pandas_object(reference, index=False).values.tobytes()
+        ).hexdigest()
+        importances = dict(
+            sorted(
+                zip(config.FEATURES, map(float, model.feature_importances_), strict=True),
+                key=lambda kv: kv[1],
+                reverse=True,
+            )
+        )
         meta = {
             "model_name": "credit-scoring-xgb",
             "version": "1.0.0",
-            "trained_at": datetime.now(timezone.utc).isoformat(),
+            "trained_at": datetime.now(UTC).isoformat(),
             "features": config.FEATURES,
             "excluded_protected_attributes": config.PROTECTED_ATTRIBUTES,
             "threshold": threshold,
@@ -112,8 +124,13 @@ def run_training() -> dict:
 
         setup_mlflow(config.MLFLOW_TRAINING_EXPERIMENT)
         with mlflow.start_run(run_name="baseline-xgb"):
-            mlflow.set_tags({"stage": "training", "data_sha256": data_hash[:16],
-                             "protected_attributes_excluded": ",".join(config.PROTECTED_ATTRIBUTES)})
+            mlflow.set_tags(
+                {
+                    "stage": "training",
+                    "data_sha256": data_hash[:16],
+                    "protected_attributes_excluded": ",".join(config.PROTECTED_ATTRIBUTES),
+                }
+            )
             mlflow.log_params({**PARAMS, "threshold": threshold, "n_features": len(config.FEATURES)})
             mlflow.log_metrics({f"holdout_{k}": v for k, v in metrics.items()})
             mlflow.log_metric("train_seconds", train_seconds)
@@ -121,8 +138,13 @@ def run_training() -> dict:
             mlflow.log_artifact(str(config.MODEL_META_FILE), artifact_path="model")
             mlflow.log_dict(importances, "feature_importance.json")
 
-        info.update(rows_train=len(train_df), rows_holdout=len(test_df), threshold=threshold,
-                    auc=round(metrics["auc"], 4), f1=round(metrics["f1"], 4))
+        info.update(
+            rows_train=len(train_df),
+            rows_holdout=len(test_df),
+            threshold=threshold,
+            auc=round(metrics["auc"], 4),
+            f1=round(metrics["f1"], 4),
+        )
     return meta
 
 

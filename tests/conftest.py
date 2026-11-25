@@ -1,4 +1,5 @@
 """Keep test runs out of logs/pipeline.jsonl, which is versioned evidence of the real pipeline."""
+
 import tempfile
 from pathlib import Path
 

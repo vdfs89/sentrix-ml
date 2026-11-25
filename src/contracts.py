@@ -16,6 +16,7 @@ Hard rules (all enforced, lazy validation collects every failure):
       leak into the model by accident (Privacy by Default)
   R10 batch-level: at least 100 rows and default rate below 80% (upstream sanity)
 """
+
 from __future__ import annotations
 
 import pandera.pandas as pa
@@ -52,8 +53,10 @@ def build_contract(with_target: bool = True) -> DataFrameSchema:
     if with_target:
         columns[config.TARGET] = Column(int, Check.isin([0, 1]), coerce=True, nullable=False)
         checks.append(
-            Check(lambda df: df[config.TARGET].mean() < 0.8,
-                  error="default rate >= 80%: upstream labelling bug suspected")
+            Check(
+                lambda df: df[config.TARGET].mean() < 0.8,
+                error="default rate >= 80%: upstream labelling bug suspected",
+            )
         )
     return DataFrameSchema(
         columns=columns,

@@ -11,6 +11,7 @@ F3  Detection quality per month vs. the ground truth of the simulation (which fe
     intentionally changed): precision / recall of PSI and KS.
 F4  Lead time: first month each alert type fired.
 """
+
 from __future__ import annotations
 
 import json
@@ -38,15 +39,22 @@ def finding_psi_binning(reference: pd.DataFrame) -> dict:
     for spec in config.DRIFT_SCHEDULE[2:]:
         cur = pd.read_csv(batch_path(spec["month"]))
         for feat in ("bill_amt1", "pay_amt1", "limit_bal"):
-            rows.append({"month": spec["month"], "feature": feat,
-                         "psi_quantile_bins": round(psi(reference[feat], cur[feat]), 4),
-                         "psi_evidently": round(_evidently_psi(reference[feat], cur[feat]), 4)})
+            rows.append(
+                {
+                    "month": spec["month"],
+                    "feature": feat,
+                    "psi_quantile_bins": round(psi(reference[feat], cur[feat]), 4),
+                    "psi_evidently": round(_evidently_psi(reference[feat], cur[feat]), 4),
+                }
+            )
     combined = pd.concat([reference["pay_amt1"], reference["pay_amt1"]])
     edges = np.histogram_bin_edges(combined, bins="sturges")
     first_bin_share = float(((reference["pay_amt1"] >= edges[0]) & (reference["pay_amt1"] < edges[1])).mean())
-    return {"comparison": rows,
-            "pay_amt1_reference_share_in_first_equal_width_bin": round(first_bin_share, 4),
-            "n_equal_width_bins_pay_amt1": int(len(edges) - 1)}
+    return {
+        "comparison": rows,
+        "pay_amt1_reference_share_in_first_equal_width_bin": round(first_bin_share, 4),
+        "n_equal_width_bins_pay_amt1": int(len(edges) - 1),
+    }
 
 
 def finding_null_false_positives(reference: pd.DataFrame, n_cur: int = 2495) -> dict:
@@ -70,9 +78,12 @@ def finding_null_false_positives(reference: pd.DataFrame, n_cur: int = 2495) -> 
         any_ks += trial_ks
         any_psi += trial_psi
     return {
-        "trials": N_NULL_TRIALS, "numerical_features": len(feats),
+        "trials": N_NULL_TRIALS,
+        "numerical_features": len(feats),
         "ks_false_positive_rate_per_feature": round(sum(ks_hits.values()) / (N_NULL_TRIALS * len(feats)), 4),
-        "psi_false_positive_rate_per_feature": round(sum(psi_hits.values()) / (N_NULL_TRIALS * len(feats)), 4),
+        "psi_false_positive_rate_per_feature": round(
+            sum(psi_hits.values()) / (N_NULL_TRIALS * len(feats)), 4
+        ),
         "share_of_batches_with_any_ks_alarm": round(any_ks / N_NULL_TRIALS, 4),
         "share_of_batches_with_any_psi_alarm": round(any_psi / N_NULL_TRIALS, 4),
     }
@@ -118,7 +129,8 @@ def run() -> dict:
         "F4_first_month_per_alert": lead_time(alerts),
     }
     (config.REPORTS_DIR / "technical_findings.json").write_text(
-        json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+        json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     return result
 
 
