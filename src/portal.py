@@ -211,6 +211,7 @@ section {{ margin:36px 0; }}
 h2 {{ font-size:20px; margin:0 0 14px; }} h2 small {{ color:var(--muted); font-weight:400; font-size:14px; }}
 .panel {{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; overflow-x:auto; }}
 svg {{ width:100%; height:auto; }}
+.demo {{ width:100%; display:block; border-radius:8px; }}
 svg .line {{ fill:none; stroke:var(--cyan); stroke-width:3; }}
 svg .dot {{ fill:var(--cyan); }} svg .dot-bad {{ fill:var(--bad); }}
 svg .ref {{ stroke:var(--blue); stroke-dasharray:4 4; }} svg .limit {{ stroke:var(--bad); stroke-dasharray:6 4; }}
@@ -250,6 +251,11 @@ footer {{ border-top:1px solid var(--line); margin-top:48px; padding:20px 0 32px
   <section>
     <h2>Degradação silenciosa <small>AUC com labels atrasados por mês</small></h2>
     <div class="panel">{chart}</div>
+  </section>
+
+  <section>
+    <h2>Grafana <small>stack local de observabilidade (<code>make up</code>): Pushgateway → Prometheus → Grafana</small></h2>
+    <div class="panel"><img class="demo" src="assets/grafana_demo.gif" alt="Dashboard Grafana do SENTRIX: KPIs, AUC por lote, PSI por feature mês a mês e alertas do Prometheus" loading="lazy"></div>
   </section>
 
   <section>
@@ -301,6 +307,9 @@ def build_site() -> Path:
     shutil.copytree(config.EVIDENTLY_DIR, SITE_DIR / "evidently")
     shutil.copy2(config.REPORTS_DIR / "monitoring_dashboard.html", SITE_DIR / "monitoring_dashboard.html")
     shutil.copy2(config.ROOT / "docs" / "assets" / "capa.png", SITE_DIR / "assets" / "capa.png")
+    shutil.copy2(
+        config.ROOT / "docs" / "assets" / "grafana_demo.gif", SITE_DIR / "assets" / "grafana_demo.gif"
+    )
     (SITE_DIR / ".nojekyll").write_text("", encoding="utf-8")
     index = SITE_DIR / "index.html"
     index.write_text(build_index(meta, records, alerts, causal, findings), encoding="utf-8")
