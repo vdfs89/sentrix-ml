@@ -6,6 +6,17 @@ Versões independentes:
 - **Projeto SENTRIX** — tags git `vX.Y.Z` e `src/__init__.py::__version__`.
 - **Modelo** `credit-scoring-xgb` — `models/model_metadata.json::version` (muda só quando o modelo é retreinado).
 
+## [1.5.0] — 2026-11-25
+
+### Adicionado
+- Seção **Interface** no README, com o GIF do dashboard Grafana (`docs/assets/grafana_demo.gif`) e o link para o portal. O GIF também aparece no portal.
+- `src/reproducibility.py`: checagem de reprodutibilidade no CI contra a evidência versionada. Dados e PSI precisam bater exatamente; as métricas do modelo, dentro de uma tolerância. O resultado vai para o artefato `reproducibility.txt`.
+- Achado técnico **A8**: o XGBoost não é bit a bit reprodutível entre plataformas.
+
+### Corrigido
+- **O threshold de decisão deixou de ser reotimizado a cada treino.** No build Linux, o ótimo de F1 saltava de 0,23 para 0,26, e a aprovação variava até 6,9 p.p. Agora o threshold é a política versionada `config.DECISION_THRESHOLD = 0.23`, e o ótimo de F1 só é registrado (`f1_optimal_threshold`).
+- O portal do Pages publica a evidência versionada, com os mesmos números do README, em vez de números regenerados no runner.
+
 ## [1.4.0] — 2026-11-25
 
 ### Adicionado
@@ -74,6 +85,7 @@ Versões independentes:
 - README com governança e LGPD e CI no GitHub Actions.
 - Identidade SENTRIX e capa.
 
+[1.5.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/vdfs89/sentrix-ml/compare/v1.2.0...v1.2.1
