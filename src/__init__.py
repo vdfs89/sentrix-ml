@@ -2,8 +2,8 @@
 
 import os
 
-__version__ = (
-    "1.2.1"  # project version (SemVer). The model has its own version in models/model_metadata.json.
-)
+# Project version (SemVer), kept in sync with pyproject.toml and the git tags.
+# The model has its own version in models/model_metadata.json.
+__version__ = "1.3.0"
 
 os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
