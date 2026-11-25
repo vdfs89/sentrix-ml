@@ -537,7 +537,7 @@ O primeiro deploy do portal mostrou AUCs um pouco diferentes das do README: dez/
 ├── site/ (gerado)           # portal do GitHub Pages (python -m src.portal)
 ├── Makefile · make.ps1      # atalhos (Linux/CI · Windows)
 ├── pyproject.toml           # configuração do Ruff e do pytest
-├── docs/                    # MODEL_CARD.md, SPEC.md, capa
+├── docs/                    # MODEL_CARD.md, SPEC.md, capa e GIF
 ├── CHANGELOG.md
 └── .github/workflows/        # ci.yml (CI + deploy Pages), release.yml (releases por tag)
 ```
