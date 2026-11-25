@@ -1,0 +1,39 @@
+name: release
+
+# CD: every SemVer tag (vX.Y.Z) becomes a GitHub Release with the CHANGELOG notes
+# and the versioned monitoring evidence attached.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v h="## [$version]" '
+            index($0, h) == 1 {found=1; next}
+            found && index($0, "## [") == 1 {exit}
+            found {print}
+          ' CHANGELOG.md > release_notes.md
+          test -s release_notes.md || { echo "No CHANGELOG entry for $version"; exit 1; }
+          cat release_notes.md
+      - name: Package monitoring evidence
+        run: |
+          zip -qr "sentrix-${GITHUB_REF_NAME}-reports.zip" reports logs/pipeline.jsonl models/model_metadata.json
+          ls -lh *.zip
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "SENTRIX $GITHUB_REF_NAME" \
+            --notes-file release_notes.md \
+            --verify-tag \
+            "sentrix-${GITHUB_REF_NAME}-reports.zip"
