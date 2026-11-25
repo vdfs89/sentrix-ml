@@ -6,6 +6,11 @@ Versões independentes:
 - **Projeto SENTRIX** — tags git `vX.Y.Z` e `src/__init__.py::__version__`.
 - **Modelo** `credit-scoring-xgb` — `models/model_metadata.json::version` (muda só quando o modelo é retreinado).
 
+## [1.2.1] — 2026-11-25
+
+### Corrigido
+- Pushgateway perdia as métricas a cada reinício do Docker (armazenamento só em memória). Agora persiste em volume (`--persistence.file=/pushgateway/metrics`), no diretório do usuário `nobody`. Ver README › Achados técnicos A7.
+
 ## [1.2.0] — 2026-11-25
 
 ### Adicionado
@@ -51,6 +56,7 @@ Versões independentes:
 - README com governança e LGPD e CI no GitHub Actions.
 - Identidade SENTRIX e capa.
 
+[1.2.1]: https://github.com/vdfs89/sentrix-ml/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/vdfs89/sentrix-ml/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/vdfs89/sentrix-ml/releases/tag/v1.0.0
