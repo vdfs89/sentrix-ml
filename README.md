@@ -30,18 +30,31 @@ Uma fintech de crédito tem um modelo de *credit scoring* em produção. Com inf
 ---
 
 ## Sumário
-1. [Como executar](#como-executar)
-2. [Arquitetura](#arquitetura)
-3. [Dataset e separação Referência × Produção](#dataset-e-separação-referência--produção)
-4. [Etapa 1 — Contratos de dados](#etapa-1--validação-de-dados-e-contratos)
-5. [Etapa 2 — Simulação e detecção de drift](#etapa-2--simulação-e-detecção-de-drift)
-6. [Etapa 3 — Observabilidade](#etapa-3--observabilidade-de-pipelines-e-modelos)
-7. [Análise causal da degradação](#análise-causal-da-degradação)
-8. [Etapa 4 — Governança e LGPD](#etapa-4--governança-e-lgpd)
-9. [Achados técnicos (errata)](#achados-técnicos-errata)
-10. [Lições aprendidas](#lições-aprendidas)
-11. [Estrutura do repositório](#estrutura-do-repositório)
-12. [Versionamento](#versionamento)
+1. [Interface](#interface)
+2. [Como executar](#como-executar)
+3. [Arquitetura](#arquitetura)
+4. [Dataset e separação Referência × Produção](#dataset-e-separação-referência--produção)
+5. [Etapa 1 — Contratos de dados](#etapa-1--validação-de-dados-e-contratos)
+6. [Etapa 2 — Simulação e detecção de drift](#etapa-2--simulação-e-detecção-de-drift)
+7. [Etapa 3 — Observabilidade](#etapa-3--observabilidade-de-pipelines-e-modelos)
+8. [Análise causal da degradação](#análise-causal-da-degradação)
+9. [Etapa 4 — Governança e LGPD](#etapa-4--governança-e-lgpd)
+10. [Achados técnicos (errata)](#achados-técnicos-errata)
+11. [Lições aprendidas](#lições-aprendidas)
+12. [Estrutura do repositório](#estrutura-do-repositório)
+13. [Versionamento](#versionamento)
+
+---
+
+## Interface
+
+<p align="center">
+  <img src="docs/assets/grafana_demo.gif" alt="SENTRIX — dashboard Grafana: KPIs, AUC por lote, PSI por feature evoluindo de set/25 a dez/25 e alertas do Prometheus" width="100%">
+</p>
+
+Dashboard **Grafana** da stack local (`make up`): KPIs, AUC e drift por lote, PSI por feature evoluindo de set/25 a dez/25 pelo seletor de lote, violações do contrato e alertas disparados no Prometheus.
+
+🔗 **Live:** [vdfs89.github.io/sentrix-ml](https://vdfs89.github.io/sentrix-ml/) — portal com o dashboard de monitoramento e os relatórios Evidently
 
 ---
 
