@@ -1,0 +1,174 @@
+{
+  "F1_psi_binning": {
+    "comparison": [
+      {
+        "month": "2025-09",
+        "feature": "bill_amt1",
+        "psi_quantile_bins": 0.0159,
+        "psi_evidently": 0.0083
+      },
+      {
+        "month": "2025-09",
+        "feature": "pay_amt1",
+        "psi_quantile_bins": 0.0114,
+        "psi_evidently": 0.0175
+      },
+      {
+        "month": "2025-09",
+        "feature": "limit_bal",
+        "psi_quantile_bins": 0.0132,
+        "psi_evidently": 0.0151
+      },
+      {
+        "month": "2025-10",
+        "feature": "bill_amt1",
+        "psi_quantile_bins": 0.0497,
+        "psi_evidently": 0.056
+      },
+      {
+        "month": "2025-10",
+        "feature": "pay_amt1",
+        "psi_quantile_bins": 0.095,
+        "psi_evidently": 0.0125
+      },
+      {
+        "month": "2025-10",
+        "feature": "limit_bal",
+        "psi_quantile_bins": 0.0441,
+        "psi_evidently": 0.0354
+      },
+      {
+        "month": "2025-11",
+        "feature": "bill_amt1",
+        "psi_quantile_bins": 0.1078,
+        "psi_evidently": 0.1767
+      },
+      {
+        "month": "2025-11",
+        "feature": "pay_amt1",
+        "psi_quantile_bins": 0.1532,
+        "psi_evidently": 0.0131
+      },
+      {
+        "month": "2025-11",
+        "feature": "limit_bal",
+        "psi_quantile_bins": 0.0894,
+        "psi_evidently": 0.0683
+      },
+      {
+        "month": "2025-12",
+        "feature": "bill_amt1",
+        "psi_quantile_bins": 0.1654,
+        "psi_evidently": 0.3381
+      },
+      {
+        "month": "2025-12",
+        "feature": "pay_amt1",
+        "psi_quantile_bins": 0.4717,
+        "psi_evidently": 0.0317
+      },
+      {
+        "month": "2025-12",
+        "feature": "limit_bal",
+        "psi_quantile_bins": 0.1837,
+        "psi_evidently": 0.1375
+      }
+    ],
+    "pay_amt1_reference_share_in_first_equal_width_bin": 0.9869,
+    "n_equal_width_bins_pay_amt1": 16
+  },
+  "F2_null_false_positives": {
+    "trials": 200,
+    "numerical_features": 14,
+    "ks_false_positive_rate_per_feature": 0.0536,
+    "psi_false_positive_rate_per_feature": 0.0,
+    "share_of_batches_with_any_ks_alarm": 0.365,
+    "share_of_batches_with_any_psi_alarm": 0.0
+  },
+  "F3_detection_quality": [
+    {
+      "month": "2025-07",
+      "truly_drifted": 0,
+      "psi_flagged": 0,
+      "psi_false_positives": [],
+      "psi_precision": null,
+      "psi_recall": null,
+      "ks_flagged": 0,
+      "ks_false_positives": [],
+      "ks_precision": null,
+      "ks_recall": null
+    },
+    {
+      "month": "2025-08",
+      "truly_drifted": 0,
+      "psi_flagged": 0,
+      "psi_false_positives": [],
+      "psi_precision": null,
+      "psi_recall": null,
+      "ks_flagged": 1,
+      "ks_false_positives": [
+        "bill_amt4"
+      ],
+      "ks_precision": 0.0,
+      "ks_recall": null
+    },
+    {
+      "month": "2025-09",
+      "truly_drifted": 14,
+      "psi_flagged": 1,
+      "psi_false_positives": [],
+      "psi_precision": 1.0,
+      "psi_recall": 0.071,
+      "ks_flagged": 14,
+      "ks_false_positives": [],
+      "ks_precision": 1.0,
+      "ks_recall": 1.0
+    },
+    {
+      "month": "2025-10",
+      "truly_drifted": 14,
+      "psi_flagged": 0,
+      "psi_false_positives": [],
+      "psi_precision": null,
+      "psi_recall": 0.0,
+      "ks_flagged": 14,
+      "ks_false_positives": [],
+      "ks_precision": 1.0,
+      "ks_recall": 1.0
+    },
+    {
+      "month": "2025-11",
+      "truly_drifted": 14,
+      "psi_flagged": 13,
+      "psi_false_positives": [],
+      "psi_precision": 1.0,
+      "psi_recall": 0.929,
+      "ks_flagged": 14,
+      "ks_false_positives": [],
+      "ks_precision": 1.0,
+      "ks_recall": 1.0
+    },
+    {
+      "month": "2025-12",
+      "truly_drifted": 14,
+      "psi_flagged": 14,
+      "psi_false_positives": [],
+      "psi_precision": 1.0,
+      "psi_recall": 1.0,
+      "ks_flagged": 14,
+      "ks_false_positives": [],
+      "ks_precision": 1.0,
+      "ks_recall": 1.0
+    }
+  ],
+  "F4_first_month_per_alert": {
+    "feature_drift_psi:WARNING": "2025-09",
+    "data_contract:CRITICAL": "2025-09_upstream_bug",
+    "prediction_drift:WARNING": "2025-11",
+    "concept_drift_performance:CRITICAL": "2025-11",
+    "label_drift:WARNING": "2025-11",
+    "feature_drift_psi:CRITICAL": "2025-12",
+    "dataset_drift:CRITICAL": "2025-12",
+    "prediction_drift:CRITICAL": "2025-12"
+  }
+}
